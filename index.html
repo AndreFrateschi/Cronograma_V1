@@ -128,6 +128,7 @@
     .toast { position: fixed; right: 18px; bottom: 18px; z-index: 20; max-width: 360px; padding: 11px 14px; color: #fff; background: #173747; border-radius: 5px; box-shadow: 0 8px 24px rgba(15,35,45,.24); opacity: 0; transform: translateY(12px); pointer-events: none; transition: .18s ease; }
     .toast.show { opacity: 1; transform: translateY(0); }
     dialog { width: min(520px, calc(100% - 28px)); border: 0; border-radius: 7px; padding: 0; box-shadow: 0 20px 70px rgba(20,40,50,.35); }
+    #businessDaysDialog { width: min(720px, calc(100% - 28px)); }
     dialog::backdrop { background: rgba(10,27,36,.55); }
     .dialog-head { display: flex; align-items: center; justify-content: space-between; padding: 15px 18px; color: #fff; background: var(--navy); }
     .dialog-head h2 { margin: 0; font-size: 17px; }
@@ -320,10 +321,10 @@
       <div class="dialog-head"><h2>Dias úteis por mês</h2><button class="close-dialog" value="cancel" aria-label="Fechar">×</button></div>
       <div class="dialog-body">
         <table class="business-days-table">
-          <thead><tr><th>Mês</th><th>Dias de semana</th><th>Feriados nacionais</th><th>Dias úteis</th></tr></thead>
+          <thead><tr><th>Mês</th><th>Dias de semana</th><th>Feriados nacionais</th><th>Dias úteis</th><th>Horas úteis</th></tr></thead>
           <tbody id="businessDaysBody"></tbody>
         </table>
-        <p class="business-days-note">Cálculo de segunda a sexta-feira, descontando somente feriados nacionais que caem em dias de semana.</p>
+        <p class="business-days-note">Cálculo de segunda a sexta-feira, descontando somente feriados nacionais que caem em dias de semana e considerando 8 horas por dia útil.</p>
       </div>
       <div class="dialog-actions"><button class="btn btn-primary" value="default">Fechar</button></div>
     </form>
@@ -434,7 +435,7 @@
       $("businessDaysBody").innerHTML = monthsBetween(first, last).map(month => {
         const result = businessDaysForMonth(month);
         const holidayNames = result.holidays.map(holiday => `${formatDate(holiday.date).slice(0,5)} ${holiday.name}`).join(" · ");
-        return `<tr><td>${escapeHtml(monthName(month))} ${month.getFullYear()}</td><td>${result.weekdays}</td><td title="${escapeHtml(holidayNames || "Nenhum feriado nacional em dia útil")}">${result.holidays.length}</td><td><strong>${result.total}</strong></td></tr>`;
+        return `<tr><td>${escapeHtml(monthName(month))} ${month.getFullYear()}</td><td>${result.weekdays}</td><td title="${escapeHtml(holidayNames || "Nenhum feriado nacional em dia útil")}">${result.holidays.length}</td><td><strong>${result.total}</strong></td><td><strong>${result.total * 8}h</strong></td></tr>`;
       }).join("");
     }
     function renderHolidayValidation() {
