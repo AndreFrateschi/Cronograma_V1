@@ -6,6 +6,9 @@
   <meta name="theme-color" content="#102532" />
   <meta name="description" content="Crie e reutilize cronogramas visuais de rollout por projeto." />
   <title>Cronograma de Projetos</title>
+  <script>
+    document.documentElement.dataset.theme = localStorage.getItem("cronograma-theme") === "dark" ? "dark" : "light";
+  </script>
   <style>
     :root {
       --ink: #15242d; --muted: #667680; --line: #d7e0e5; --soft: #eef3f6;
@@ -26,6 +29,10 @@
     .project-heading strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; }
     .project-heading span { color: #b8c8d1; font-size: 12px; }
     .toolbar { display: flex; align-items: center; gap: 8px; }
+    .theme-switch { height: 34px; display: inline-flex; align-items: center; padding: 3px; border: 1px solid #5d707b; border-radius: 5px; background: rgba(255,255,255,.06); }
+    .theme-option { width: 30px; height: 26px; display: grid; place-items: center; border: 0; border-radius: 3px; padding: 0; color: #b8c8d1; background: transparent; font-size: 16px; line-height: 1; }
+    .theme-option:hover { color: #fff; background: rgba(255,255,255,.1); }
+    .theme-option[aria-pressed="true"] { color: #102532; background: #fff; }
     .btn { min-height: 34px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 1px solid #bdc9d0; border-radius: 5px; padding: 7px 11px; background: #fff; color: #21343f; font-weight: 650; white-space: nowrap; }
     .btn:hover { background: #edf3f6; }
     .btn:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid rgba(32, 137, 190, .28); outline-offset: 1px; }
@@ -121,6 +128,64 @@
     .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 18px; border-top: 1px solid #d7e0e5; background: #f4f7f8; }
     .close-dialog { border: 0; background: transparent; color: #fff; font-size: 20px; }
     .hidden-input { display: none; }
+    [data-theme="dark"] { color-scheme: dark; }
+    [data-theme="dark"] body { color: #e5edf1; background: #10171c; }
+    [data-theme="dark"] .appbar { background: #0a151c; border-bottom-color: #26799c; }
+    [data-theme="dark"] .sidebar { background: #172229; border-color: #33434c; }
+    [data-theme="dark"] .side-title,
+    [data-theme="dark"] .summary-copy h1,
+    [data-theme="dark"] .metric strong,
+    [data-theme="dark"] .side-section h2 { color: #f1f6f8; }
+    [data-theme="dark"] .field label,
+    [data-theme="dark"] .summary-copy p,
+    [data-theme="dark"] .metric span,
+    [data-theme="dark"] .project-item span,
+    [data-theme="dark"] .holiday-check-head span,
+    [data-theme="dark"] .holiday-item small,
+    [data-theme="dark"] .holiday-empty { color: #9eb0ba; }
+    [data-theme="dark"] .field input,
+    [data-theme="dark"] .field select,
+    [data-theme="dark"] .field textarea { color: #e8f0f4; background: #0f181e; border-color: #43545e; }
+    [data-theme="dark"] .btn { color: #e5edf1; background: #1b2931; border-color: #53656f; }
+    [data-theme="dark"] .btn:hover { background: #273943; }
+    [data-theme="dark"] .btn-primary { color: #fff; background: #1785b5; border-color: #1785b5; }
+    [data-theme="dark"] .btn-danger { color: #ffaaaa; border-color: #874b4b; }
+    [data-theme="dark"] .btn-dark { color: #fff; background: transparent; border-color: #5d707b; }
+    [data-theme="dark"] .theme-option[aria-pressed="true"] { color: #eaf2f5; background: #2b718f; }
+    [data-theme="dark"] .holiday-check,
+    [data-theme="dark"] .metric,
+    [data-theme="dark"] .timeline-shell,
+    [data-theme="dark"] .sticky-label,
+    [data-theme="dark"] .legend { background: #172229; border-color: #3a4a53; }
+    [data-theme="dark"] .holiday-check { border-left-color: #e6a23c; }
+    [data-theme="dark"] .holiday-item { color: #bdcbd2; }
+    [data-theme="dark"] .holiday-item time { color: #f2ae45; }
+    [data-theme="dark"] .metrics { background: #3a4a53; border-color: #3a4a53; }
+    [data-theme="dark"] .project-item { color: #e5edf1; }
+    [data-theme="dark"] .project-item:hover,
+    [data-theme="dark"] .project-item.active { background: #22313a; border-color: #3a89aa; }
+    [data-theme="dark"] .side-section { border-color: #33434c; }
+    [data-theme="dark"] .timeline-row,
+    [data-theme="dark"] .timeline-row > *,
+    [data-theme="dark"] .slot,
+    [data-theme="dark"] .add-activity-row,
+    [data-theme="dark"] .add-activity-row .sticky-label { border-color: #33434c; }
+    [data-theme="dark"] .timeline-row.activity:nth-child(even) .slot,
+    [data-theme="dark"] .timeline-row.activity:nth-child(even) .sticky-label { background-color: #1b2931; }
+    [data-theme="dark"] .activity-name { color: #e5edf1; }
+    [data-theme="dark"] .activity-name:focus { background: #0f181e; }
+    [data-theme="dark"] .days-row,
+    [data-theme="dark"] .days-row .sticky-label { color: #b3c2c9; background: #20313a; }
+    [data-theme="dark"] .day-cell { color: #b3c2c9; }
+    [data-theme="dark"] .day-cell.holiday,
+    [data-theme="dark"] .slot.holiday-column:not(.active) { color: #ffc163; background: #49361d !important; }
+    [data-theme="dark"] .legend-item { color: #b8c7ce; }
+    [data-theme="dark"] .empty-risk { color: #f4ce91; background: #49361d; border-left-color: #d99732; }
+    [data-theme="dark"] .empty-risk strong,
+    [data-theme="dark"] .empty-risk span { color: #f4ce91; }
+    [data-theme="dark"] dialog { color: #e5edf1; background: #172229; }
+    [data-theme="dark"] .dialog-actions { background: #111b21; border-color: #34454e; }
+    [data-theme="dark"] .toast { background: #27617b; }
     @media (max-width: 980px) {
       .workspace { grid-template-columns: 1fr; }
       .sidebar { border-right: 0; border-bottom: 1px solid #cbd6dc; }
@@ -142,6 +207,7 @@
       .summary { display: block; }
       .metrics { margin-top: 12px; overflow: auto; }
       .metric { min-width: 82px; }
+      .theme-switch { margin-left: auto; }
       :root { --label: 235px; --week: 58px; }
     }
     @media print {
@@ -159,6 +225,10 @@
     <div class="brand"><div class="brand-mark">C</div><div><strong>Cronograma de Projetos</strong><span>Planejamento e acompanhamento</span></div></div>
     <div class="project-heading"><strong id="barProjectName">Rollout Yamaha DDC/Data Lake</strong><span id="barPeriod">18 semanas</span></div>
     <div class="toolbar">
+      <div class="theme-switch" role="group" aria-label="Tema visual">
+        <button class="theme-option" id="lightTheme" type="button" title="Usar tema claro" aria-label="Tema claro" aria-pressed="true">☀</button>
+        <button class="theme-option" id="darkTheme" type="button" title="Usar tema escuro" aria-label="Tema escuro" aria-pressed="false">◐</button>
+      </div>
       <button class="btn btn-dark" id="newProject"><span class="icon">＋</span><span class="hide-medium">Novo projeto</span></button>
       <button class="btn btn-dark" id="saveProject"><span class="icon">✓</span><span class="hide-medium">Salvar</span></button>
       <button class="btn btn-primary" id="exportProject"><span class="icon">↓</span><span class="hide-medium">Exportar</span></button>
@@ -277,6 +347,15 @@
     const escapeHtml = value => String(value).replace(/[&<>'"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c]));
     let dirtyTimer;
 
+    function setTheme(theme) {
+      const selected = theme === "dark" ? "dark" : "light";
+      document.documentElement.dataset.theme = selected;
+      localStorage.setItem("cronograma-theme", selected);
+      $("lightTheme").setAttribute("aria-pressed", String(selected === "light"));
+      $("darkTheme").setAttribute("aria-pressed", String(selected === "dark"));
+      document.querySelector('meta[name="theme-color"]').content = selected === "dark" ? "#0a151c" : "#102532";
+    }
+
     function isoWeek(date) {
       const copy = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
       copy.setUTCDate(copy.getUTCDate() + 4 - (copy.getUTCDay() || 7));
@@ -393,6 +472,8 @@
       p.modules.forEach(m=>m.activities.forEach(a=>{a.start=clamp(a.start,0,p.weeks-1);a.end=clamp(a.end,-1,p.weeks-1);})); markDirty(); render();
     }));
     $("saveProject").onclick=()=>save(true);
+    $("lightTheme").onclick=()=>setTheme("light");
+    $("darkTheme").onclick=()=>setTheme("dark");
     $("newProject").onclick=()=>{ const p=defaultProject(); p.name="Novo projeto de rollout"; p.version="V1"; p.risk=""; projects.push(p); currentId=p.id; setInputs(); save(); render(); notify("Novo projeto criado."); };
     $("duplicateProject").onclick=()=>{ const copy=structuredClone(project()); copy.id=crypto.randomUUID(); copy.name += " — cópia"; copy.modules.forEach(m=>{m.id=crypto.randomUUID();m.activities.forEach(a=>a.id=crypto.randomUUID());}); projects.push(copy); currentId=copy.id; setInputs(); save(); render(); notify("Projeto duplicado."); };
     $("deleteProject").onclick=()=>{ if(projects.length===1){notify("Mantenha pelo menos um projeto.");return;} if(!confirm("Excluir este projeto?"))return; projects=projects.filter(p=>p.id!==currentId); currentId=projects[0].id; setInputs(); save(); render(); };
@@ -404,7 +485,7 @@
     $("confirmModule").onclick=event=>{ event.preventDefault(); const name=$("moduleName").value.trim(),code=$("moduleCode").value.trim(); if(!name||!code)return; project().modules.push({id:crypto.randomUUID(),code,name,color:$("moduleColor").value,collapsed:false,activities:[]}); $("moduleDialog").close(); $("moduleForm").reset(); markDirty(); render(); };
     $("newActivityType").innerHTML=Object.entries(TYPES).map(([value,type])=>`<option value="${value}">${escapeHtml(type.label)}</option>`).join("");
     $("confirmActivity").onclick=event=>{ event.preventDefault(); const name=$("newActivityName").value.trim(); const moduleId=$("activityModuleId").value; const module=project().modules.find(item=>item.id===moduleId); if(!name||!module)return; module.activities.push({id:crypto.randomUUID(),name,type:$("newActivityType").value,start:0,end:0}); $("activityDialog").close(); markDirty(); render(); notify("Atividade adicionada."); };
-    setInputs(); render(); save();
+    setTheme(document.documentElement.dataset.theme); setInputs(); render(); save();
   </script>
 </body>
 </html>
