@@ -243,6 +243,593 @@
       </div>
       <button class="btn btn-dark" id="newProject"><span class="icon">＋</span><span class="hide-medium">Novo projeto</span></button>
       <button class="btn btn-dark" id="saveProject"><span class="icon">✓</span><span class="hide-medium">Salvar</span></button>
+      <button class="btn btn-dark" id="importProjectTop" title="Importar arquivo de cronograma"><span class="icon">↑</span><span class="hide-medium">Importar</span></button>
+      <button class="btn btn-primary" id="exportProject"><span class="icon">↓</span><span class="hide-medium">Exportar</span></button>
+    </div>
+  </header>
+
+  <div class="workspace">
+    <aside class="sidebar">
+      <h2 class="side-title">Configuração <span id="saveState">Salvo</span></h2>
+      <div class="sidebar-fields">
+        <div class="field"><label for="projectName">Nome do projeto</label><input id="projectName" /></div>
+        <div class="field"><label for="startDate">Início</label><input id="startDate" type="date" required /></div>
+        <div class="field"><label for="weekCount">Semanas</label><input id="weekCount" type="number" min="4" max="40" /></div>
+      </div>
+      <div class="field"><label for="version">Versão</label><input id="version" placeholder="V1" /></div>
+      <div class="field"><label for="riskText">Risco crítico</label><textarea id="riskText" placeholder="Descreva o risco ou deixe em branco"></textarea></div>
+      <section class="holiday-check" aria-live="polite">
+        <div class="holiday-check-head"><strong>Feriados nacionais no período</strong><span id="holidayCheckCount"></span></div>
+        <div class="holiday-list" id="holidayValidation"></div>
+      </section>
+      <div class="side-actions">
+        <button class="btn" id="duplicateProject">Duplicar</button>
+        <button class="btn" id="printProject">Imprimir / PDF</button>
+        <button class="btn" id="businessDaysButton">▦ Dias úteis por mês</button>
+        <button class="btn" id="importProject">Importar arquivo</button>
+        <button class="btn btn-danger" id="deleteProject">Excluir</button>
+      </div>
+      <input class="hidden-input" id="importFile" type="file" accept="application/json,.json" />
+      <div class="side-section"><h2>Meus projetos</h2><div class="project-list" id="projectList"></div></div>
+    </aside>
+
+    <main class="main">
+      <section class="summary">
+        <div class="summary-copy"><h1 id="mainProjectName">Rollout Yamaha DDC/Data Lake</h1><p id="mainProjectMeta">Estratégia de implantação</p></div>
+        <div class="metrics" aria-label="Resumo do projeto">
+          <div class="metric"><span>Módulos</span><strong id="moduleMetric">2</strong></div>
+          <div class="metric"><span>Atividades</span><strong id="activityMetric">0</strong></div>
+          <div class="metric"><span>Go Lives</span><strong id="goLiveMetric">0</strong></div>
+          <div class="metric"><span>Feriados úteis</span><strong id="holidayMetric">0</strong></div>
+        </div>
+      </section>
+      <section class="riskbar" id="riskBar"><strong>Risco</strong><span id="riskBarText"></span><button id="editRisk" aria-label="Editar risco">✎</button></section>
+      <section class="timeline-shell" aria-label="Cronograma semanal"><div class="timeline" id="timeline"></div></section>
+    </main>
+  </div>
+
+  <dialog id="moduleDialog">
+    <form method="dialog" id="moduleForm">
+      <div class="dialog-head"><h2>Novo módulo</h2><button class="close-dialog" value="cancel" aria-label="Fechar">×</button></div>
+      <div class="dialog-body">
+        <div class="field"><label for="moduleName">Nome do módulo</label><input id="moduleName" required placeholder="Ex.: Integrações" /></div>
+        <div class="field-row">
+          <div class="field"><label for="moduleCode">Código</label><input id="moduleCode" required placeholder="M3" /></div>
+          <div class="field"><label for="moduleColor">Cor</label><input id="moduleColor" type="color" value="#1769aa" /></div>
+        </div>
+      </div>
+      <div class="dialog-actions"><button class="btn" value="cancel">Cancelar</button><button class="btn btn-primary" id="confirmModule" value="default">Adicionar</button></div>
+    </form>
+  </dialog>
+  <dialog id="activityDialog">
+    <form method="dialog" id="activityForm">
+      <div class="dialog-head"><h2>Adicionar atividade</h2><button class="close-dialog" value="cancel" aria-label="Fechar">×</button></div>
+      <div class="dialog-body">
+        <input id="activityModuleId" type="hidden" />
+        <div class="field"><label for="newActivityName">Nome da atividade</label><input id="newActivityName" required placeholder="Ex.: Preparação do ambiente" /></div>
+        <div class="field-row">
+          <div class="field"><label for="newActivityType">Tipo</label><select id="newActivityType"></select></div>
+          <div class="field"><label for="newActivityColor">Cor da atividade</label><input id="newActivityColor" type="color" value="#5669c4" /></div>
+        </div>
+      </div>
+      <div class="dialog-actions"><button class="btn" value="cancel">Cancelar</button><button class="btn btn-primary" id="confirmActivity" value="default">Adicionar</button></div>
+    </form>
+  </dialog>
+  <dialog id="businessDaysDialog">
+    <form method="dialog">
+      <div class="dialog-head"><h2>Dias úteis por mês</h2><button class="close-dialog" value="cancel" aria-label="Fechar">×</button></div>
+      <div class="dialog-body">
+        <table class="business-days-table">
+          <thead><tr><th>Mês</th><th>Dias de semana</th><th>Feriados nacionais</th><th>Dias úteis</th></tr></thead>
+          <tbody id="businessDaysBody"></tbody>
+        </table>
+        <p class="business-days-note">Cálculo de segunda a sexta-feira, descontando somente feriados nacionais que caem em dias de semana.</p>
+      </div>
+      <div class="dialog-actions"><button class="btn btn-primary" value="default">Fechar</button></div>
+    </form>
+  </dialog>
+  <div class="toast" id="toast" role="status"></div>
+
+  <script>
+    const TYPES = {
+      detail: { label: "Detalhamento", color: "#5669c4" },
+      communication: { label: "Comunicação / GMO", color: "#0d91c8" },
+      approval: { label: "Aprovação", color: "#ee9d19" },
+      development: { label: "Desenvolvimento", color: "#c9272e" },
+      impact: { label: "Impactos / Usuários", color: "#7420a5" },
+      validation: { label: "Validação", color: "#f06d00" },
+      decision: { label: "Go / No Go", color: "#bf0c68" },
+      training: { label: "Treinamento", color: "#008c78" },
+      change: { label: "GMUD", color: "#3d555f" },
+      golive: { label: "Go Live", color: "#156b2a" },
+      hypercare: { label: "Hypercare", color: "#4d8c2c" },
+      risk: { label: "Risco", color: "#c91f26" }
+    };
+    const NATIONAL_HOLIDAYS = [
+      [0,1,"Confraternização Universal"],[3,21,"Tiradentes"],[4,1,"Dia Mundial do Trabalho"],
+      [8,7,"Independência do Brasil"],[9,12,"Nossa Senhora Aparecida"],[10,2,"Finados"],
+      [10,15,"Proclamação da República"],[10,20,"Dia Nacional de Zumbi e da Consciência Negra"],[11,25,"Natal"]
+    ];
+    const seedActivities = (code, offset = 0) => [
+      ["Detalhamento","detail",0+offset,2+offset],["Comunicação e Engajamento (GMO)","communication",0+offset,7+offset],
+      ["Aprovação das histórias","approval",2+offset,3+offset],["Desenvolvimento TS","development",3+offset,8+offset],
+      ["Mapeamento de Impactos (GMO)","impact",2+offset,3+offset],["Mapeamento Usuários Finais e Est. Treinamento (GMO)","impact",2+offset,3+offset],
+      ["Implantação Homologação","validation",8+offset,8+offset],["Verificação TS","validation",8+offset,8+offset],
+      ["Validação de Negócio","validation",9+offset,10+offset],["Go/No Go","decision",11+offset,11+offset],
+      ["Treinamento Multiplicadores (GMO)","training",11+offset,11+offset],["Replicação do Treinamento (Usuários) (GMO)","training",11+offset,11+offset],
+      ["GMUD","change",11+offset,11+offset],["Go Live","golive",11+offset,11+offset],
+      ["Hypercare","hypercare",13+offset,17+offset],["Reforço de processos e/ou capacitação (GMO)","hypercare",13+offset,14+offset]
+    ].map(([name,type,start,end], i) => ({ id: code+"-"+i+"-"+Date.now(), name, type, start, end }));
+    const defaultProject = () => ({
+      id: crypto.randomUUID(), name: "Rollout Yamaha DDC/Data Lake", startDate: "2026-07-13", weeks: 18, version: "V2",
+      risk: "Não entrega das informações a monitorar via DDC (Módulo 1) — dependência crítica para o Go Live.",
+      modules: [
+        { id: crypto.randomUUID(), code: "M1", name: "MONITORAMENTO E VISUALIZAÇÃO DE DCs 01 A 05 + MOLDES", color: "#1d63b7", collapsed: false, activities: seedActivities("M1") },
+        { id: crypto.randomUUID(), code: "M2", name: "MONITORAMENTO DE OUTROS PARÂMETROS E VISÕES HISTÓRICAS", color: "#247c32", collapsed: false, activities: seedActivities("M2", 2) }
+      ]
+    });
+    let projects = JSON.parse(localStorage.getItem("rollout-studio-projects") || "null") || [defaultProject()];
+    let currentId = localStorage.getItem("rollout-studio-current") || projects[0].id;
+    if (!projects.some(p => p.id === currentId)) currentId = projects[0].id;
+    const $ = id => document.getElementById(id);
+    const project = () => projects.find(p => p.id === currentId);
+    const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+    const escapeHtml = value => String(value).replace(/[&<>'"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c]));
+    let dirtyTimer;
+
+    function setTheme(theme) {
+      const selected = theme === "dark" ? "dark" : "light";
+      document.documentElement.dataset.theme = selected;
+      localStorage.setItem("cronograma-theme", selected);
+      $("lightTheme").setAttribute("aria-pressed", String(selected === "light"));
+      $("darkTheme").setAttribute("aria-pressed", String(selected === "dark"));
+      document.querySelector('meta[name="theme-color"]').content = selected === "dark" ? "#0a151c" : "#102532";
+    }
+
+    function isoWeek(date) {
+      const copy = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+      copy.setUTCDate(copy.getUTCDate() + 4 - (copy.getUTCDay() || 7));
+      const yearStart = new Date(Date.UTC(copy.getUTCFullYear(), 0, 1));
+      return Math.ceil((((copy - yearStart) / 86400000) + 1) / 7);
+    }
+    function monday(date) {
+      const d = new Date(date + "T12:00:00");
+      const day = d.getDay() || 7;
+      d.setDate(d.getDate() - day + 1);
+      return d;
+    }
+    function addDays(date, days) { const d = new Date(date); d.setDate(d.getDate() + days); return d; }
+    function formatDate(date) { return new Intl.DateTimeFormat("pt-BR", { day:"2-digit", month:"2-digit", year:"numeric" }).format(date); }
+    function monthName(date) { return new Intl.DateTimeFormat("pt-BR", { month:"long" }).format(date); }
+    function nationalHolidaysBetween(start, end) {
+      const found = [];
+      for (let year = start.getFullYear(); year <= end.getFullYear(); year++) {
+        NATIONAL_HOLIDAYS.forEach(([month,day,name]) => {
+          const date = new Date(year, month, day, 12);
+          if (date >= start && date <= end) found.push({ date, name, isBusinessDay: date.getDay() >= 1 && date.getDay() <= 5 });
+        });
+      }
+      return found.sort((a,b) => a.date - b.date);
+    }
+    function holidaysInWeek(start) {
+      return nationalHolidaysBetween(start, addDays(start, 6)).filter(holiday => holiday.isBusinessDay);
+    }
+    function monthsBetween(start, end) {
+      const months = []; const cursor = new Date(start.getFullYear(), start.getMonth(), 1, 12);
+      while (cursor <= end) { months.push(new Date(cursor)); cursor.setMonth(cursor.getMonth() + 1); }
+      return months;
+    }
+    function businessDaysForMonth(month) {
+      const first = new Date(month.getFullYear(), month.getMonth(), 1, 12);
+      const last = new Date(month.getFullYear(), month.getMonth() + 1, 0, 12);
+      let weekdays = 0;
+      for (let date = new Date(first); date <= last; date.setDate(date.getDate() + 1)) {
+        if (date.getDay() >= 1 && date.getDay() <= 5) weekdays++;
+      }
+      const holidays = nationalHolidaysBetween(first, last).filter(holiday => holiday.isBusinessDay);
+      return { weekdays, holidays, total: weekdays - holidays.length };
+    }
+    function renderBusinessDaysDialog() {
+      const p = project(); const first = monday(p.startDate); const last = addDays(first, (p.weeks * 7) - 1);
+      $("businessDaysBody").innerHTML = monthsBetween(first, last).map(month => {
+        const result = businessDaysForMonth(month);
+        const holidayNames = result.holidays.map(holiday => `${formatDate(holiday.date).slice(0,5)} ${holiday.name}`).join(" · ");
+        return `<tr><td>${escapeHtml(monthName(month))} ${month.getFullYear()}</td><td>${result.weekdays}</td><td title="${escapeHtml(holidayNames || "Nenhum feriado nacional em dia útil")}">${result.holidays.length}</td><td><strong>${result.total}</strong></td></tr>`;
+      }).join("");
+    }
+    function renderHolidayValidation() {
+      const p = project(); const first = monday(p.startDate); const last = addDays(first, (p.weeks * 7) - 1);
+      const holidays = nationalHolidaysBetween(first, last); const businessHolidays = holidays.filter(holiday => holiday.isBusinessDay);
+      $("holidayCheckCount").textContent = holidays.length ? `${holidays.length} encontrado${holidays.length === 1 ? "" : "s"}` : "Período validado";
+      $("holidayMetric").textContent = businessHolidays.length;
+      $("holidayValidation").innerHTML = holidays.length
+        ? holidays.map(holiday => `<div class="holiday-item"><time datetime="${holiday.date.toISOString().slice(0,10)}">${formatDate(holiday.date).slice(0,5)}</time><span>${escapeHtml(holiday.name)}<small>${holiday.isBusinessDay ? "Reduz 1 dia útil e será marcado com *" : "Cai no fim de semana e não reduz dias úteis"}</small></span></div>`).join("")
+        : `<p class="holiday-empty">Nenhum feriado nacional dentro das datas selecionadas.</p>`;
+    }
+    function notify(message) { const toast = $("toast"); toast.textContent = message; toast.classList.add("show"); clearTimeout(toast._timer); toast._timer = setTimeout(() => toast.classList.remove("show"), 2200); }
+    function markDirty() { $("saveState").textContent = "Alterado"; clearTimeout(dirtyTimer); dirtyTimer = setTimeout(save, 900); }
+    function save(showMessage = false) {
+      localStorage.setItem("rollout-studio-projects", JSON.stringify(projects));
+      localStorage.setItem("rollout-studio-current", currentId); $("saveState").textContent = "Salvo";
+      if (showMessage) notify("Projeto salvo neste navegador."); renderProjectList();
+    }
+    function setInputs() {
+      const p = project(); $("projectName").value = p.name; $("startDate").value = p.startDate; $("weekCount").value = p.weeks; $("version").value = p.version || ""; $("riskText").value = p.risk || "";
+    }
+    function renderProjectList() {
+      $("projectList").innerHTML = projects.map(p => `<button class="project-item ${p.id===currentId?"active":""}" data-project="${p.id}"><strong>${escapeHtml(p.name)}</strong><span>${p.weeks} semanas · ${escapeHtml(p.version || "Sem versão")}</span></button>`).join("");
+      document.querySelectorAll("[data-project]").forEach(btn => btn.onclick = () => { currentId = btn.dataset.project; setInputs(); render(); save(); });
+    }
+    function monthSegments(weeks) {
+      const segments = [];
+      weeks.forEach((w, index) => { const key = `${w.getFullYear()}-${w.getMonth()}`; const last = segments.at(-1); if (last && last.key === key) last.count++; else segments.push({ key, name: monthName(w), count:1, start:index }); });
+      return segments;
+    }
+    function renderTimeline() {
+      const p = project(); document.documentElement.style.setProperty("--weeks", p.weeks);
+      const first = monday(p.startDate); const weeks = Array.from({length:p.weeks}, (_,i) => addDays(first, i*7));
+      const holidayMap = weeks.map(holidaysInWeek); const timeline = $("timeline");
+      const months = monthSegments(weeks).map(s => `<div class="month" style="grid-column:${s.start+2} / span ${s.count}">${escapeHtml(s.name)} ${weeks[s.start].getFullYear()}</div>`).join("");
+      let html = `<div class="timeline-row month-row"><div class="sticky-label"></div>${months}</div>`;
+      html += `<div class="timeline-row week-row"><div class="sticky-label">Atividade / Semana ISO</div>${weeks.map(w => `<div class="week-head">S${isoWeek(w)}<br>${String(w.getDate()).padStart(2,"0")}/${String(w.getMonth()+1).padStart(2,"0")}</div>`).join("")}</div>`;
+      html += `<div class="timeline-row days-row"><div class="sticky-label">Dias úteis (* feriado nacional)</div>${weeks.map((w,i) => { const holidays=holidayMap[i]; const title=holidays.map(h=>`${h.name} (${formatDate(h.date)})`).join(" · "); return `<div class="day-cell ${holidays.length?"holiday":""}" ${title?`title="${escapeHtml(title)}"`:""}>${5-holidays.length}${holidays.length?"*":""}</div>`; }).join("")}</div>`;
+      p.modules.forEach((module, moduleIndex) => {
+        html += `<div class="timeline-row"><div class="module-head" style="--module-color:${module.color}"><button data-collapse="${module.id}" aria-label="${module.collapsed?"Expandir":"Recolher"} módulo">${module.collapsed?"＋":"−"}</button><strong>${escapeHtml(module.code)} · ${escapeHtml(module.name)}</strong><span>${module.activities.length} atividades</span><div class="module-actions"><button data-add="${module.id}" aria-label="Adicionar atividade">＋</button><button data-remove-module="${module.id}" aria-label="Excluir módulo">×</button></div></div></div>`;
+        if (!module.collapsed) {
+          module.activities.forEach(activity => {
+            const color = activity.color || TYPES[activity.type]?.color || module.color;
+            html += `<div class="timeline-row activity" style="--module-color:${module.color};--activity-color:${color}"><div class="sticky-label activity-label"><span class="activity-code">${escapeHtml(module.code)}</span><input class="activity-name" data-name="${module.id}|${activity.id}" value="${escapeHtml(activity.name)}" aria-label="Nome da atividade"><button class="remove-activity" data-remove="${module.id}|${activity.id}" aria-label="Excluir atividade">×</button></div>${weeks.map((w,i) => `<button class="slot ${i>=activity.start&&i<=activity.end?"active":""} ${holidayMap[i].length?"holiday-column":""}" data-slot="${module.id}|${activity.id}|${i}" aria-label="Semana ${isoWeek(w)}: ${i>=activity.start&&i<=activity.end?"ativa":"inativa"}"></button>`).join("")}</div>`;
+          });
+          html += `<div class="add-activity-row"><div class="sticky-label"><button class="btn" data-add="${module.id}">＋ Adicionar atividade</button></div><div></div></div>`;
+        }
+      });
+      const customLegend = []; const customKeys = new Set();
+      p.modules.flatMap(module => module.activities).filter(activity => activity.color).forEach(activity => {
+        const key = `${activity.name}|${activity.color}`;
+        if (!customKeys.has(key)) { customKeys.add(key); customLegend.push(activity); }
+      });
+      html += `<div class="legend">${Object.values(TYPES).map(t => `<span class="legend-item"><i class="swatch" style="--swatch:${t.color}"></i>${escapeHtml(t.label)}</span>`).join("")}${customLegend.length ? `<span class="legend-separator" aria-hidden="true"></span>${customLegend.map(activity => `<span class="legend-item"><i class="swatch" style="--swatch:${activity.color}"></i>${escapeHtml(activity.name)}</span>`).join("")}` : ""}<button class="btn" id="addModule">＋ Adicionar módulo</button></div>`;
+      timeline.innerHTML = html;
+      wireTimelineEvents();
+    }
+    function wireTimelineEvents() {
+      document.querySelectorAll("[data-collapse]").forEach(btn => btn.onclick = () => { const m=project().modules.find(x=>x.id===btn.dataset.collapse); m.collapsed=!m.collapsed; markDirty(); renderTimeline(); });
+      document.querySelectorAll("[data-add]").forEach(btn => btn.onclick = () => addActivity(btn.dataset.add));
+      document.querySelectorAll("[data-remove-module]").forEach(btn => btn.onclick = () => { if (!confirm("Excluir este módulo e todas as atividades?")) return; project().modules=project().modules.filter(m=>m.id!==btn.dataset.removeModule); markDirty(); render(); });
+      document.querySelectorAll("[data-remove]").forEach(btn => btn.onclick = () => { const [mid,aid]=btn.dataset.remove.split("|"); const m=project().modules.find(x=>x.id===mid); m.activities=m.activities.filter(a=>a.id!==aid); markDirty(); render(); });
+      document.querySelectorAll("[data-name]").forEach(input => input.onchange = () => { const [mid,aid]=input.dataset.name.split("|"); project().modules.find(x=>x.id===mid).activities.find(a=>a.id===aid).name=input.value; markDirty(); render(); });
+      document.querySelectorAll("[data-slot]").forEach(btn => btn.onclick = () => toggleSlot(btn.dataset.slot));
+      $("addModule").onclick = () => $("moduleDialog").showModal();
+    }
+    function toggleSlot(value) {
+      const [mid,aid,indexText]=value.split("|"); const index=Number(indexText); const a=project().modules.find(x=>x.id===mid).activities.find(x=>x.id===aid);
+      if (index < a.start || index > a.end) { if (index < a.start) a.start=index; else a.end=index; }
+      else if (a.start===a.end) { a.start=0; a.end=-1; }
+      else if (index===a.start) a.start++; else if (index===a.end) a.end--; else { a.start=index; }
+      markDirty(); renderTimeline();
+    }
+    function addActivity(moduleId) {
+      $("activityModuleId").value = moduleId;
+      $("newActivityName").value = "";
+      $("newActivityType").value = "detail";
+      $("newActivityColor").value = TYPES.detail.color;
+      $("activityDialog").showModal();
+      setTimeout(() => $("newActivityName").focus(), 0);
+    }
+    function render() {
+      const p=project(); const first=monday(p.startDate); const last=addDays(first,(p.weeks*7)-1);
+      $("barProjectName").textContent=p.name; $("barPeriod").textContent=`${formatDate(first)} a ${formatDate(last)} · ${p.version||""}`;
+      $("mainProjectName").textContent=p.name; $("mainProjectMeta").textContent=`Estratégia de implantação · início ${formatDate(first)} · ${p.weeks} semanas`;
+      $("riskBarText").textContent=p.risk || "Nenhum risco crítico informado."; $("riskBar").classList.toggle("empty-risk",!p.risk);
+      $("moduleMetric").textContent=p.modules.length; const activities=p.modules.flatMap(m=>m.activities); $("activityMetric").textContent=activities.length; $("goLiveMetric").textContent=activities.filter(a=>a.type==="golive").length;
+      renderHolidayValidation(); renderTimeline(); renderProjectList();
+    }
+    function normalizeImportedProject(payload) {
+      const source = payload?.format === "cronograma-projetos" ? payload.project : payload;
+      if (!source || typeof source !== "object" || !Array.isArray(source.modules)) throw new Error("Formato incompatível");
+      if (typeof source.startDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(source.startDate)) throw new Error("Data inicial inválida");
+      const weeks = clamp(Number(source.weeks) || 18, 4, 40);
+      const modules = source.modules.map((module, moduleIndex) => {
+        if (!module || typeof module !== "object" || !Array.isArray(module.activities)) throw new Error("Módulo inválido");
+        return {
+          id: crypto.randomUUID(),
+          code: String(module.code || `M${moduleIndex + 1}`),
+          name: String(module.name || `Módulo ${moduleIndex + 1}`),
+          color: /^#[0-9a-f]{6}$/i.test(module.color || "") ? module.color : "#1769aa",
+          collapsed: Boolean(module.collapsed),
+          activities: module.activities.map(activity => ({
+            id: crypto.randomUUID(),
+            name: String(activity?.name || "Atividade sem nome"),
+            type: TYPES[activity?.type] ? activity.type : "detail",
+            color: /^#[0-9a-f]{6}$/i.test(activity?.color || "") ? activity.color : undefined,
+            start: clamp(Number(activity?.start) || 0, 0, weeks - 1),
+            end: clamp(Number.isFinite(Number(activity?.end)) ? Number(activity.end) : 0, -1, weeks - 1)
+          }))
+        };
+      });
+      return {
+        id: crypto.randomUUID(),
+        name: String(source.name || "Projeto importado"),
+        startDate: source.startDate,
+        weeks,
+        version: String(source.version || "V1"),
+        risk: String(source.risk || ""),
+        modules
+      };
+    }
+    ["projectName","startDate","weekCount","version","riskText"].forEach(id => $(id).addEventListener("change", () => {
+      const p=project();
+      if (!$('startDate').value) { $('startDate').setCustomValidity('Selecione uma data inicial para validar os feriados.'); $('startDate').reportValidity(); $('startDate').value=p.startDate; return; }
+      $('startDate').setCustomValidity(''); p.name=$("projectName").value.trim()||"Projeto sem nome"; p.startDate=$("startDate").value; p.weeks=clamp(Number($("weekCount").value)||18,4,40); p.version=$("version").value.trim(); p.risk=$("riskText").value.trim();
+      p.modules.forEach(m=>m.activities.forEach(a=>{a.start=clamp(a.start,0,p.weeks-1);a.end=clamp(a.end,-1,p.weeks-1);})); markDirty(); render();
+    }));
+    $("saveProject").onclick=()=>save(true);
+    $("lightTheme").onclick=()=>setTheme("light");
+    $("darkTheme").onclick=()=>setTheme("dark");
+    $("newProject").onclick=()=>{ const p=defaultProject(); p.name="Novo projeto de rollout"; p.version="V1"; p.risk=""; projects.push(p); currentId=p.id; setInputs(); save(); render(); notify("Novo projeto criado."); };
+    $("duplicateProject").onclick=()=>{ const copy=structuredClone(project()); copy.id=crypto.randomUUID(); copy.name += " — cópia"; copy.modules.forEach(m=>{m.id=crypto.randomUUID();m.activities.forEach(a=>a.id=crypto.randomUUID());}); projects.push(copy); currentId=copy.id; setInputs(); save(); render(); notify("Projeto duplicado."); };
+    $("deleteProject").onclick=()=>{ if(projects.length===1){notify("Mantenha pelo menos um projeto.");return;} if(!confirm("Excluir este projeto?"))return; projects=projects.filter(p=>p.id!==currentId); currentId=projects[0].id; setInputs(); save(); render(); };
+    $("printProject").onclick=()=>window.print();
+    $("businessDaysButton").onclick=()=>{ renderBusinessDaysDialog(); $("businessDaysDialog").showModal(); };
+    $("editRisk").onclick=()=>$("riskText").focus();
+    $("exportProject").onclick=()=>{ save(); const archive={format:"cronograma-projetos",version:1,exportedAt:new Date().toISOString(),project:project()}; const blob=new Blob([JSON.stringify(archive,null,2)],{type:"application/json"}); const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=(project().name.replace(/[^a-z0-9]+/gi,"-").toLowerCase()||"cronograma")+".json"; a.click(); URL.revokeObjectURL(a.href); notify("Arquivo do cronograma exportado."); };
+    const openImport=()=>$("importFile").click();
+    $("importProject").onclick=openImport;
+    $("importProjectTop").onclick=openImport;
+    $("importFile").onchange=async event=>{ try{const payload=JSON.parse(await event.target.files[0].text()); const imported=normalizeImportedProject(payload); projects.push(imported); currentId=imported.id; setInputs(); save(); render(); notify("Arquivo importado com sucesso.");}catch{notify("Arquivo incompatível ou inválido.");} event.target.value=""; };
+    $("confirmModule").onclick=event=>{ event.preventDefault(); const name=$("moduleName").value.trim(),code=$("moduleCode").value.trim(); if(!name||!code)return; project().modules.push({id:crypto.randomUUID(),code,name,color:$("moduleColor").value,collapsed:false,activities:[]}); $("moduleDialog").close(); $("moduleForm").reset(); markDirty(); render(); };
+    $("newActivityType").innerHTML=Object.entries(TYPES).map(([value,type])=>`<option value="${value}">${escapeHtml(type.label)}</option>`).join("");
+    $("newActivityType").onchange=()=>{ $("newActivityColor").value=TYPES[$("newActivityType").value].color; };
+    $("confirmActivity").onclick=event=>{ event.preventDefault(); const name=$("newActivityName").value.trim(); const moduleId=$("activityModuleId").value; const module=project().modules.find(item=>item.id===moduleId); if(!name||!module)return; module.activities.push({id:crypto.randomUUID(),name,type:$("newActivityType").value,color:$("newActivityColor").value,start:0,end:0}); $("activityDialog").close(); markDirty(); render(); notify("Atividade adicionada com cor personalizada."); };
+    setTheme(document.documentElement.dataset.theme); setInputs(); render(); save();
+  </script>
+</body>
+</html>
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#102532" />
+  <meta name="description" content="Crie e reutilize cronogramas visuais de rollout por projeto." />
+  <title>Cronograma de Projetos</title>
+  <script>
+    document.documentElement.dataset.theme = localStorage.getItem("cronograma-theme") === "dark" ? "dark" : "light";
+  </script>
+  <style>
+    :root {
+      --ink: #15242d; --muted: #667680; --line: #d7e0e5; --soft: #eef3f6;
+      --paper: #ffffff; --navy: #102532; --blue: #1769aa; --teal: #0a8575;
+      --green: #2f7d32; --amber: #e89612; --red: #c62828; --purple: #7041a3;
+      --label: 300px; --week: 68px;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-width: 320px; color: var(--ink); background: #f2f5f7; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 14px; letter-spacing: 0; }
+    button, input, select, textarea { font: inherit; }
+    button { cursor: pointer; }
+    .appbar { height: 64px; display: flex; align-items: center; gap: 18px; padding: 0 22px; color: #fff; background: var(--navy); border-bottom: 4px solid #1b607d; }
+    .brand { display: flex; align-items: center; gap: 11px; min-width: 210px; }
+    .brand-mark { width: 30px; height: 30px; display: grid; place-items: center; border: 2px solid #fff; color: #fff; font-weight: 800; }
+    .brand strong { display: block; font-size: 15px; }
+    .brand span { display: block; color: #b8c8d1; font-size: 11px; }
+    .project-heading { min-width: 0; flex: 1; }
+    .project-heading strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; }
+    .project-heading span { color: #b8c8d1; font-size: 12px; }
+    .toolbar { display: flex; align-items: center; gap: 8px; }
+    .theme-switch { height: 34px; display: inline-flex; align-items: center; padding: 3px; border: 1px solid #5d707b; border-radius: 5px; background: rgba(255,255,255,.06); }
+    .theme-option { width: 30px; height: 26px; display: grid; place-items: center; border: 0; border-radius: 3px; padding: 0; color: #b8c8d1; background: transparent; font-size: 16px; line-height: 1; }
+    .theme-option:hover { color: #fff; background: rgba(255,255,255,.1); }
+    .theme-option[aria-pressed="true"] { color: #102532; background: #fff; }
+    .btn { min-height: 34px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 1px solid #bdc9d0; border-radius: 5px; padding: 7px 11px; background: #fff; color: #21343f; font-weight: 650; white-space: nowrap; }
+    .btn:hover { background: #edf3f6; }
+    .btn:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid rgba(32, 137, 190, .28); outline-offset: 1px; }
+    .btn-primary { border-color: #1785b5; background: #1785b5; color: #fff; }
+    .btn-primary:hover { background: #106f99; }
+    .btn-dark { border-color: #5d707b; background: transparent; color: #fff; }
+    .btn-dark:hover { background: rgba(255,255,255,.1); }
+    .btn-danger { border-color: #e4b4b4; color: #a62323; }
+    .icon { width: 18px; text-align: center; font-size: 16px; line-height: 1; }
+    .workspace { display: grid; grid-template-columns: 286px minmax(0, 1fr); min-height: calc(100vh - 64px); }
+    .sidebar { padding: 18px; background: #e8eef1; border-right: 1px solid #cbd6dc; overflow-y: auto; }
+    .side-title { margin: 0 0 15px; display: flex; align-items: center; justify-content: space-between; font-size: 15px; }
+    .field { display: grid; gap: 6px; margin-bottom: 13px; }
+    .field label { color: #4d606b; font-size: 12px; font-weight: 700; }
+    .field input, .field select, .field textarea { width: 100%; border: 1px solid #b9c7ce; border-radius: 5px; padding: 9px 10px; color: var(--ink); background: #fff; }
+    .field textarea { min-height: 70px; resize: vertical; }
+    .field-row { display: grid; grid-template-columns: 1fr 92px; gap: 10px; }
+    .holiday-check { margin: 14px 0 4px; padding: 11px; border: 1px solid #c7d4da; border-left: 4px solid #d88a12; background: #fff; }
+    .holiday-check-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+    .holiday-check-head strong { font-size: 12px; }
+    .holiday-check-head span { color: var(--muted); font-size: 10px; }
+    .holiday-list { display: grid; gap: 6px; }
+    .holiday-item { display: grid; grid-template-columns: 54px 1fr; gap: 7px; align-items: start; color: #536670; font-size: 11px; }
+    .holiday-item time { color: #a35f00; font-weight: 800; }
+    .holiday-item small { display: block; margin-top: 1px; color: var(--muted); font-size: 10px; }
+    .holiday-empty { margin: 0; color: var(--muted); font-size: 11px; }
+    .side-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 18px 0; }
+    .side-section { padding-top: 16px; border-top: 1px solid #c7d2d8; }
+    .side-section h2 { margin: 0 0 10px; font-size: 13px; }
+    .project-list { display: grid; gap: 7px; }
+    .project-item { width: 100%; display: grid; gap: 2px; border: 1px solid transparent; border-radius: 5px; padding: 9px; text-align: left; background: transparent; color: var(--ink); }
+    .project-item:hover { background: #fff; border-color: #c4d1d7; }
+    .project-item.active { background: #fff; border-color: #1b83ad; box-shadow: inset 3px 0 #1b83ad; }
+    .project-item strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+    .project-item span { color: var(--muted); font-size: 11px; }
+    .main { min-width: 0; padding: 18px; overflow: hidden; }
+    .summary { display: flex; align-items: stretch; justify-content: space-between; gap: 18px; margin-bottom: 14px; }
+    .summary-copy h1 { margin: 0 0 4px; font-size: 22px; line-height: 1.25; }
+    .summary-copy p { margin: 0; color: var(--muted); }
+    .metrics { display: flex; gap: 1px; border: 1px solid #cbd7dd; background: #cbd7dd; }
+    .metric { min-width: 92px; padding: 9px 12px; background: #fff; }
+    .metric span { display: block; color: var(--muted); font-size: 10px; text-transform: uppercase; }
+    .metric strong { display: block; margin-top: 2px; font-size: 19px; }
+    .riskbar { display: flex; align-items: center; gap: 10px; min-height: 42px; margin-bottom: 12px; padding: 9px 12px; color: #fff; background: var(--red); border-left: 5px solid #8f1515; }
+    .riskbar strong { font-size: 12px; text-transform: uppercase; }
+    .riskbar span { flex: 1; }
+    .riskbar button { border: 0; padding: 3px 7px; background: transparent; color: #fff; font-size: 18px; }
+    .timeline-shell { border: 1px solid #bfcbd2; background: #fff; overflow: auto; max-height: calc(100vh - 220px); }
+    .timeline { min-width: calc(var(--label) + var(--weeks) * var(--week)); }
+    .timeline-row { display: grid; grid-template-columns: var(--label) repeat(var(--weeks), var(--week)); min-height: 36px; border-bottom: 1px solid #d9e2e7; }
+    .timeline-row > * { min-width: 0; border-right: 1px solid #d9e2e7; }
+    .sticky-label { position: sticky; left: 0; z-index: 3; background: #fff; }
+    .month-row { position: sticky; top: 0; z-index: 5; min-height: 30px; color: #fff; background: #1b5068; }
+    .month-row .sticky-label { background: #1b5068; }
+    .month { display: grid; place-items: center; border-right-color: #143d4f; font-size: 11px; text-transform: uppercase; }
+    .week-row { position: sticky; top: 30px; z-index: 5; min-height: 40px; color: #fff; background: #243c4c; }
+    .week-row .sticky-label { display: flex; align-items: center; padding: 0 12px; background: #243c4c; font-weight: 700; }
+    .week-head { display: grid; place-items: center; color: #d8e5eb; font-size: 11px; }
+    .days-row { position: sticky; top: 70px; z-index: 5; min-height: 32px; background: #e8f1f5; }
+    .days-row .sticky-label { display: flex; align-items: center; padding: 0 12px; color: #60747e; background: #e8f1f5; font-size: 11px; }
+    .day-cell { display: grid; place-items: center; color: #5e727c; font-size: 11px; }
+    .day-cell.holiday { color: #c56e00; background: #fff4df; font-weight: 800; cursor: help; }
+    .module-head { position: sticky; left: 0; z-index: 4; display: flex; align-items: center; gap: 9px; grid-column: 1 / -1; min-height: 42px; padding: 0 12px; color: #fff; background: var(--module-color); border-top: 4px solid #fff; }
+    .module-head button { width: 26px; height: 26px; border: 0; background: rgba(255,255,255,.13); color: #fff; }
+    .module-head strong { flex: 1; }
+    .module-head .module-actions { display: flex; gap: 5px; }
+    .activity-label { display: grid; grid-template-columns: 48px 1fr auto; align-items: center; gap: 8px; padding: 6px 8px; }
+    .activity-code { color: var(--module-color); font-size: 10px; font-weight: 800; }
+    .activity-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 0; padding: 4px 2px; background: transparent; color: var(--ink); }
+    .activity-name:focus { background: #fff; }
+    .remove-activity { border: 0; background: transparent; color: #9a3131; opacity: .35; }
+    .timeline-row:hover .remove-activity, .remove-activity:focus-visible { opacity: 1; }
+    .slot { position: relative; display: grid; place-items: center; border: 0; border-right: 1px solid #d9e2e7; background: transparent; }
+    .timeline-row.activity:nth-child(even) .slot, .timeline-row.activity:nth-child(even) .sticky-label { background-color: #f2f7f9; }
+    .slot.active::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #fff; }
+    .slot.active { background: var(--activity-color) !important; }
+    .slot:hover { box-shadow: inset 0 0 0 2px #2a8fb9; }
+    .slot.holiday-column:not(.active) { background: #fff8eb !important; }
+    .add-activity-row { display: grid; grid-template-columns: var(--label) 1fr; min-height: 38px; border-bottom: 1px solid #d9e2e7; }
+    .add-activity-row .sticky-label { padding: 5px 8px; border-right: 1px solid #d9e2e7; }
+    .legend { display: flex; flex-wrap: wrap; gap: 7px 16px; padding: 11px 12px; border-top: 3px solid #243c4c; background: #fff; }
+    .legend-item { display: flex; align-items: center; gap: 6px; color: #536670; font-size: 11px; }
+    .swatch { width: 13px; height: 13px; background: var(--swatch); }
+    .legend-separator { width: 1px; align-self: stretch; min-height: 20px; background: #d5dfe4; }
+    .business-days-table { width: 100%; border-collapse: collapse; }
+    .business-days-table th, .business-days-table td { border-bottom: 1px solid #d7e0e5; padding: 10px 8px; text-align: left; }
+    .business-days-table th { color: #536670; background: #eef3f5; font-size: 11px; text-transform: uppercase; }
+    .business-days-table td:nth-child(n+2), .business-days-table th:nth-child(n+2) { text-align: center; }
+    .business-days-table strong { color: #116f98; font-size: 16px; }
+    .business-days-note { margin: 12px 0 0; color: var(--muted); font-size: 11px; }
+    .empty-risk { color: #8a5a20; background: #fff3dc; border-left-color: #e2a336; }
+    .empty-risk strong, .empty-risk span { color: #76501f; }
+    .toast { position: fixed; right: 18px; bottom: 18px; z-index: 20; max-width: 360px; padding: 11px 14px; color: #fff; background: #173747; border-radius: 5px; box-shadow: 0 8px 24px rgba(15,35,45,.24); opacity: 0; transform: translateY(12px); pointer-events: none; transition: .18s ease; }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    dialog { width: min(520px, calc(100% - 28px)); border: 0; border-radius: 7px; padding: 0; box-shadow: 0 20px 70px rgba(20,40,50,.35); }
+    dialog::backdrop { background: rgba(10,27,36,.55); }
+    .dialog-head { display: flex; align-items: center; justify-content: space-between; padding: 15px 18px; color: #fff; background: var(--navy); }
+    .dialog-head h2 { margin: 0; font-size: 17px; }
+    .dialog-body { padding: 18px; }
+    .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 18px; border-top: 1px solid #d7e0e5; background: #f4f7f8; }
+    .close-dialog { border: 0; background: transparent; color: #fff; font-size: 20px; }
+    .hidden-input { display: none; }
+    [data-theme="dark"] { color-scheme: dark; }
+    [data-theme="dark"] body { color: #e5edf1; background: #10171c; }
+    [data-theme="dark"] .appbar { background: #0a151c; border-bottom-color: #26799c; }
+    [data-theme="dark"] .sidebar { background: #172229; border-color: #33434c; }
+    [data-theme="dark"] .side-title,
+    [data-theme="dark"] .summary-copy h1,
+    [data-theme="dark"] .metric strong,
+    [data-theme="dark"] .side-section h2 { color: #f1f6f8; }
+    [data-theme="dark"] .field label,
+    [data-theme="dark"] .summary-copy p,
+    [data-theme="dark"] .metric span,
+    [data-theme="dark"] .project-item span,
+    [data-theme="dark"] .holiday-check-head span,
+    [data-theme="dark"] .holiday-item small,
+    [data-theme="dark"] .holiday-empty { color: #9eb0ba; }
+    [data-theme="dark"] .field input,
+    [data-theme="dark"] .field select,
+    [data-theme="dark"] .field textarea { color: #e8f0f4; background: #0f181e; border-color: #43545e; }
+    [data-theme="dark"] .btn { color: #e5edf1; background: #1b2931; border-color: #53656f; }
+    [data-theme="dark"] .btn:hover { background: #273943; }
+    [data-theme="dark"] .btn-primary { color: #fff; background: #1785b5; border-color: #1785b5; }
+    [data-theme="dark"] .btn-danger { color: #ffaaaa; border-color: #874b4b; }
+    [data-theme="dark"] .btn-dark { color: #fff; background: transparent; border-color: #5d707b; }
+    [data-theme="dark"] .theme-option[aria-pressed="true"] { color: #eaf2f5; background: #2b718f; }
+    [data-theme="dark"] .holiday-check,
+    [data-theme="dark"] .metric,
+    [data-theme="dark"] .timeline-shell,
+    [data-theme="dark"] .sticky-label,
+    [data-theme="dark"] .legend { background: #172229; border-color: #3a4a53; }
+    [data-theme="dark"] .holiday-check { border-left-color: #e6a23c; }
+    [data-theme="dark"] .holiday-item { color: #bdcbd2; }
+    [data-theme="dark"] .holiday-item time { color: #f2ae45; }
+    [data-theme="dark"] .metrics { background: #3a4a53; border-color: #3a4a53; }
+    [data-theme="dark"] .project-item { color: #e5edf1; }
+    [data-theme="dark"] .project-item:hover,
+    [data-theme="dark"] .project-item.active { background: #22313a; border-color: #3a89aa; }
+    [data-theme="dark"] .side-section { border-color: #33434c; }
+    [data-theme="dark"] .timeline-row,
+    [data-theme="dark"] .timeline-row > *,
+    [data-theme="dark"] .slot,
+    [data-theme="dark"] .add-activity-row,
+    [data-theme="dark"] .add-activity-row .sticky-label { border-color: #33434c; }
+    [data-theme="dark"] .timeline-row.activity:nth-child(even) .slot,
+    [data-theme="dark"] .timeline-row.activity:nth-child(even) .sticky-label { background-color: #1b2931; }
+    [data-theme="dark"] .activity-name { color: #e5edf1; }
+    [data-theme="dark"] .activity-name:focus { background: #0f181e; }
+    [data-theme="dark"] .days-row,
+    [data-theme="dark"] .days-row .sticky-label { color: #b3c2c9; background: #20313a; }
+    [data-theme="dark"] .day-cell { color: #b3c2c9; }
+    [data-theme="dark"] .day-cell.holiday,
+    [data-theme="dark"] .slot.holiday-column:not(.active) { color: #ffc163; background: #49361d !important; }
+    [data-theme="dark"] .legend-item { color: #b8c7ce; }
+    [data-theme="dark"] .legend-separator { background: #3a4a53; }
+    [data-theme="dark"] .business-days-table th,
+    [data-theme="dark"] .business-days-table td { border-color: #34454e; }
+    [data-theme="dark"] .business-days-table th { color: #b8c7ce; background: #20313a; }
+    [data-theme="dark"] .business-days-table strong { color: #62b9df; }
+    [data-theme="dark"] .empty-risk { color: #f4ce91; background: #49361d; border-left-color: #d99732; }
+    [data-theme="dark"] .empty-risk strong,
+    [data-theme="dark"] .empty-risk span { color: #f4ce91; }
+    [data-theme="dark"] dialog { color: #e5edf1; background: #172229; }
+    [data-theme="dark"] .dialog-actions { background: #111b21; border-color: #34454e; }
+    [data-theme="dark"] .toast { background: #27617b; }
+    @media (max-width: 980px) {
+      .workspace { grid-template-columns: 1fr; }
+      .sidebar { border-right: 0; border-bottom: 1px solid #cbd6dc; }
+      .sidebar-fields { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px; }
+      .sidebar-fields .field { margin-bottom: 0; }
+      .side-actions { display: flex; }
+      .side-section { display: none; }
+      .timeline-shell { max-height: none; }
+      .toolbar .hide-medium { display: none; }
+    }
+    @media (max-width: 640px) {
+      .appbar { height: auto; min-height: 64px; flex-wrap: wrap; padding: 10px 14px; }
+      .brand { min-width: 0; }
+      .project-heading { order: 3; flex-basis: 100%; }
+      .workspace { min-height: calc(100vh - 104px); }
+      .sidebar-fields { grid-template-columns: 1fr 1fr; }
+      .sidebar-fields .field:first-child { grid-column: 1 / -1; }
+      .main { padding: 12px; }
+      .summary { display: block; }
+      .metrics { margin-top: 12px; overflow: auto; }
+      .metric { min-width: 82px; }
+      .theme-switch { margin-left: auto; }
+      :root { --label: 235px; --week: 58px; }
+    }
+    @media print {
+      .appbar, .sidebar, .toolbar, .summary, .remove-activity, .module-actions, .add-activity-row { display: none !important; }
+      .workspace { display: block; }
+      .main { padding: 0; }
+      .timeline-shell { max-height: none; overflow: visible; border: 0; }
+      .timeline { transform-origin: top left; }
+      .riskbar { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    }
+  </style>
+</head>
+<body>
+  <header class="appbar">
+    <div class="brand"><div class="brand-mark">C</div><div><strong>Cronograma de Projetos</strong><span>Planejamento e acompanhamento</span></div></div>
+    <div class="project-heading"><strong id="barProjectName">Rollout Yamaha DDC/Data Lake</strong><span id="barPeriod">18 semanas</span></div>
+    <div class="toolbar">
+      <div class="theme-switch" role="group" aria-label="Tema visual">
+        <button class="theme-option" id="lightTheme" type="button" title="Usar tema claro" aria-label="Tema claro" aria-pressed="true">☀</button>
+        <button class="theme-option" id="darkTheme" type="button" title="Usar tema escuro" aria-label="Tema escuro" aria-pressed="false">◐</button>
+      </div>
+      <button class="btn btn-dark" id="newProject"><span class="icon">＋</span><span class="hide-medium">Novo projeto</span></button>
+      <button class="btn btn-dark" id="saveProject"><span class="icon">✓</span><span class="hide-medium">Salvar</span></button>
       <button class="btn btn-primary" id="exportProject"><span class="icon">↓</span><span class="hide-medium">Exportar</span></button>
     </div>
   </header>
