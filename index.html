@@ -116,6 +116,13 @@
     .legend { display: flex; flex-wrap: wrap; gap: 7px 16px; padding: 11px 12px; border-top: 3px solid #243c4c; background: #fff; }
     .legend-item { display: flex; align-items: center; gap: 6px; color: #536670; font-size: 11px; }
     .swatch { width: 13px; height: 13px; background: var(--swatch); }
+    .legend-separator { width: 1px; align-self: stretch; min-height: 20px; background: #d5dfe4; }
+    .business-days-table { width: 100%; border-collapse: collapse; }
+    .business-days-table th, .business-days-table td { border-bottom: 1px solid #d7e0e5; padding: 10px 8px; text-align: left; }
+    .business-days-table th { color: #536670; background: #eef3f5; font-size: 11px; text-transform: uppercase; }
+    .business-days-table td:nth-child(n+2), .business-days-table th:nth-child(n+2) { text-align: center; }
+    .business-days-table strong { color: #116f98; font-size: 16px; }
+    .business-days-note { margin: 12px 0 0; color: var(--muted); font-size: 11px; }
     .empty-risk { color: #8a5a20; background: #fff3dc; border-left-color: #e2a336; }
     .empty-risk strong, .empty-risk span { color: #76501f; }
     .toast { position: fixed; right: 18px; bottom: 18px; z-index: 20; max-width: 360px; padding: 11px 14px; color: #fff; background: #173747; border-radius: 5px; box-shadow: 0 8px 24px rgba(15,35,45,.24); opacity: 0; transform: translateY(12px); pointer-events: none; transition: .18s ease; }
@@ -180,6 +187,11 @@
     [data-theme="dark"] .day-cell.holiday,
     [data-theme="dark"] .slot.holiday-column:not(.active) { color: #ffc163; background: #49361d !important; }
     [data-theme="dark"] .legend-item { color: #b8c7ce; }
+    [data-theme="dark"] .legend-separator { background: #3a4a53; }
+    [data-theme="dark"] .business-days-table th,
+    [data-theme="dark"] .business-days-table td { border-color: #34454e; }
+    [data-theme="dark"] .business-days-table th { color: #b8c7ce; background: #20313a; }
+    [data-theme="dark"] .business-days-table strong { color: #62b9df; }
     [data-theme="dark"] .empty-risk { color: #f4ce91; background: #49361d; border-left-color: #d99732; }
     [data-theme="dark"] .empty-risk strong,
     [data-theme="dark"] .empty-risk span { color: #f4ce91; }
@@ -252,6 +264,7 @@
       <div class="side-actions">
         <button class="btn" id="duplicateProject">Duplicar</button>
         <button class="btn" id="printProject">Imprimir / PDF</button>
+        <button class="btn" id="businessDaysButton">▦ Dias úteis por mês</button>
         <button class="btn" id="importProject">Importar</button>
         <button class="btn btn-danger" id="deleteProject">Excluir</button>
       </div>
@@ -293,9 +306,25 @@
       <div class="dialog-body">
         <input id="activityModuleId" type="hidden" />
         <div class="field"><label for="newActivityName">Nome da atividade</label><input id="newActivityName" required placeholder="Ex.: Preparação do ambiente" /></div>
-        <div class="field"><label for="newActivityType">Tipo</label><select id="newActivityType"></select></div>
+        <div class="field-row">
+          <div class="field"><label for="newActivityType">Tipo</label><select id="newActivityType"></select></div>
+          <div class="field"><label for="newActivityColor">Cor da atividade</label><input id="newActivityColor" type="color" value="#5669c4" /></div>
+        </div>
       </div>
       <div class="dialog-actions"><button class="btn" value="cancel">Cancelar</button><button class="btn btn-primary" id="confirmActivity" value="default">Adicionar</button></div>
+    </form>
+  </dialog>
+  <dialog id="businessDaysDialog">
+    <form method="dialog">
+      <div class="dialog-head"><h2>Dias úteis por mês</h2><button class="close-dialog" value="cancel" aria-label="Fechar">×</button></div>
+      <div class="dialog-body">
+        <table class="business-days-table">
+          <thead><tr><th>Mês</th><th>Dias de semana</th><th>Feriados nacionais</th><th>Dias úteis</th></tr></thead>
+          <tbody id="businessDaysBody"></tbody>
+        </table>
+        <p class="business-days-note">Cálculo de segunda a sexta-feira, descontando somente feriados nacionais que caem em dias de semana.</p>
+      </div>
+      <div class="dialog-actions"><button class="btn btn-primary" value="default">Fechar</button></div>
     </form>
   </dialog>
   <div class="toast" id="toast" role="status"></div>
@@ -384,6 +413,29 @@
     function holidaysInWeek(start) {
       return nationalHolidaysBetween(start, addDays(start, 6)).filter(holiday => holiday.isBusinessDay);
     }
+    function monthsBetween(start, end) {
+      const months = []; const cursor = new Date(start.getFullYear(), start.getMonth(), 1, 12);
+      while (cursor <= end) { months.push(new Date(cursor)); cursor.setMonth(cursor.getMonth() + 1); }
+      return months;
+    }
+    function businessDaysForMonth(month) {
+      const first = new Date(month.getFullYear(), month.getMonth(), 1, 12);
+      const last = new Date(month.getFullYear(), month.getMonth() + 1, 0, 12);
+      let weekdays = 0;
+      for (let date = new Date(first); date <= last; date.setDate(date.getDate() + 1)) {
+        if (date.getDay() >= 1 && date.getDay() <= 5) weekdays++;
+      }
+      const holidays = nationalHolidaysBetween(first, last).filter(holiday => holiday.isBusinessDay);
+      return { weekdays, holidays, total: weekdays - holidays.length };
+    }
+    function renderBusinessDaysDialog() {
+      const p = project(); const first = monday(p.startDate); const last = addDays(first, (p.weeks * 7) - 1);
+      $("businessDaysBody").innerHTML = monthsBetween(first, last).map(month => {
+        const result = businessDaysForMonth(month);
+        const holidayNames = result.holidays.map(holiday => `${formatDate(holiday.date).slice(0,5)} ${holiday.name}`).join(" · ");
+        return `<tr><td>${escapeHtml(monthName(month))} ${month.getFullYear()}</td><td>${result.weekdays}</td><td title="${escapeHtml(holidayNames || "Nenhum feriado nacional em dia útil")}">${result.holidays.length}</td><td><strong>${result.total}</strong></td></tr>`;
+      }).join("");
+    }
     function renderHolidayValidation() {
       const p = project(); const first = monday(p.startDate); const last = addDays(first, (p.weeks * 7) - 1);
       const holidays = nationalHolidaysBetween(first, last); const businessHolidays = holidays.filter(holiday => holiday.isBusinessDay);
@@ -424,13 +476,18 @@
         html += `<div class="timeline-row"><div class="module-head" style="--module-color:${module.color}"><button data-collapse="${module.id}" aria-label="${module.collapsed?"Expandir":"Recolher"} módulo">${module.collapsed?"＋":"−"}</button><strong>${escapeHtml(module.code)} · ${escapeHtml(module.name)}</strong><span>${module.activities.length} atividades</span><div class="module-actions"><button data-add="${module.id}" aria-label="Adicionar atividade">＋</button><button data-remove-module="${module.id}" aria-label="Excluir módulo">×</button></div></div></div>`;
         if (!module.collapsed) {
           module.activities.forEach(activity => {
-            const color = TYPES[activity.type]?.color || module.color;
+            const color = activity.color || TYPES[activity.type]?.color || module.color;
             html += `<div class="timeline-row activity" style="--module-color:${module.color};--activity-color:${color}"><div class="sticky-label activity-label"><span class="activity-code">${escapeHtml(module.code)}</span><input class="activity-name" data-name="${module.id}|${activity.id}" value="${escapeHtml(activity.name)}" aria-label="Nome da atividade"><button class="remove-activity" data-remove="${module.id}|${activity.id}" aria-label="Excluir atividade">×</button></div>${weeks.map((w,i) => `<button class="slot ${i>=activity.start&&i<=activity.end?"active":""} ${holidayMap[i].length?"holiday-column":""}" data-slot="${module.id}|${activity.id}|${i}" aria-label="Semana ${isoWeek(w)}: ${i>=activity.start&&i<=activity.end?"ativa":"inativa"}"></button>`).join("")}</div>`;
           });
           html += `<div class="add-activity-row"><div class="sticky-label"><button class="btn" data-add="${module.id}">＋ Adicionar atividade</button></div><div></div></div>`;
         }
       });
-      html += `<div class="legend">${Object.values(TYPES).map(t => `<span class="legend-item"><i class="swatch" style="--swatch:${t.color}"></i>${escapeHtml(t.label)}</span>`).join("")}<button class="btn" id="addModule">＋ Adicionar módulo</button></div>`;
+      const customLegend = []; const customKeys = new Set();
+      p.modules.flatMap(module => module.activities).filter(activity => activity.color).forEach(activity => {
+        const key = `${activity.name}|${activity.color}`;
+        if (!customKeys.has(key)) { customKeys.add(key); customLegend.push(activity); }
+      });
+      html += `<div class="legend">${Object.values(TYPES).map(t => `<span class="legend-item"><i class="swatch" style="--swatch:${t.color}"></i>${escapeHtml(t.label)}</span>`).join("")}${customLegend.length ? `<span class="legend-separator" aria-hidden="true"></span>${customLegend.map(activity => `<span class="legend-item"><i class="swatch" style="--swatch:${activity.color}"></i>${escapeHtml(activity.name)}</span>`).join("")}` : ""}<button class="btn" id="addModule">＋ Adicionar módulo</button></div>`;
       timeline.innerHTML = html;
       wireTimelineEvents();
     }
@@ -454,6 +511,7 @@
       $("activityModuleId").value = moduleId;
       $("newActivityName").value = "";
       $("newActivityType").value = "detail";
+      $("newActivityColor").value = TYPES.detail.color;
       $("activityDialog").showModal();
       setTimeout(() => $("newActivityName").focus(), 0);
     }
@@ -478,13 +536,15 @@
     $("duplicateProject").onclick=()=>{ const copy=structuredClone(project()); copy.id=crypto.randomUUID(); copy.name += " — cópia"; copy.modules.forEach(m=>{m.id=crypto.randomUUID();m.activities.forEach(a=>a.id=crypto.randomUUID());}); projects.push(copy); currentId=copy.id; setInputs(); save(); render(); notify("Projeto duplicado."); };
     $("deleteProject").onclick=()=>{ if(projects.length===1){notify("Mantenha pelo menos um projeto.");return;} if(!confirm("Excluir este projeto?"))return; projects=projects.filter(p=>p.id!==currentId); currentId=projects[0].id; setInputs(); save(); render(); };
     $("printProject").onclick=()=>window.print();
+    $("businessDaysButton").onclick=()=>{ renderBusinessDaysDialog(); $("businessDaysDialog").showModal(); };
     $("editRisk").onclick=()=>$("riskText").focus();
     $("exportProject").onclick=()=>{ save(); const blob=new Blob([JSON.stringify(project(),null,2)],{type:"application/json"}); const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=(project().name.replace(/[^a-z0-9]+/gi,"-").toLowerCase()||"cronograma")+".json"; a.click(); URL.revokeObjectURL(a.href); notify("Projeto exportado."); };
     $("importProject").onclick=()=>$("importFile").click();
     $("importFile").onchange=async event=>{ try{const imported=JSON.parse(await event.target.files[0].text()); imported.id=crypto.randomUUID(); projects.push(imported); currentId=imported.id; setInputs(); save(); render(); notify("Projeto importado.");}catch{notify("Arquivo de projeto inválido.");} event.target.value=""; };
     $("confirmModule").onclick=event=>{ event.preventDefault(); const name=$("moduleName").value.trim(),code=$("moduleCode").value.trim(); if(!name||!code)return; project().modules.push({id:crypto.randomUUID(),code,name,color:$("moduleColor").value,collapsed:false,activities:[]}); $("moduleDialog").close(); $("moduleForm").reset(); markDirty(); render(); };
     $("newActivityType").innerHTML=Object.entries(TYPES).map(([value,type])=>`<option value="${value}">${escapeHtml(type.label)}</option>`).join("");
-    $("confirmActivity").onclick=event=>{ event.preventDefault(); const name=$("newActivityName").value.trim(); const moduleId=$("activityModuleId").value; const module=project().modules.find(item=>item.id===moduleId); if(!name||!module)return; module.activities.push({id:crypto.randomUUID(),name,type:$("newActivityType").value,start:0,end:0}); $("activityDialog").close(); markDirty(); render(); notify("Atividade adicionada."); };
+    $("newActivityType").onchange=()=>{ $("newActivityColor").value=TYPES[$("newActivityType").value].color; };
+    $("confirmActivity").onclick=event=>{ event.preventDefault(); const name=$("newActivityName").value.trim(); const moduleId=$("activityModuleId").value; const module=project().modules.find(item=>item.id===moduleId); if(!name||!module)return; module.activities.push({id:crypto.randomUUID(),name,type:$("newActivityType").value,color:$("newActivityColor").value,start:0,end:0}); $("activityDialog").close(); markDirty(); render(); notify("Atividade adicionada com cor personalizada."); };
     setTheme(document.documentElement.dataset.theme); setInputs(); render(); save();
   </script>
 </body>
