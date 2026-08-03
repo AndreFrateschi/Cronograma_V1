@@ -85,6 +85,11 @@
     .riskbar strong { font-size: 12px; text-transform: uppercase; }
     .riskbar span { flex: 1; }
     .riskbar button { border: 0; padding: 3px 7px; background: transparent; color: #fff; font-size: 18px; }
+    .view-toolbar { display: flex; align-items: center; justify-content: flex-end; margin-bottom: 9px; }
+    .view-switch { display: inline-flex; align-items: center; padding: 3px; border: 1px solid #bdc9d0; border-radius: 5px; background: #fff; }
+    .view-option { min-height: 28px; border: 0; border-radius: 3px; padding: 4px 11px; background: transparent; color: #536670; font-size: 12px; font-weight: 700; }
+    .view-option:hover { background: #edf3f6; }
+    .view-option[aria-pressed="true"] { background: #1769aa; color: #fff; }
     .timeline-shell { border: 1px solid #bfcbd2; background: #fff; overflow: auto; max-height: calc(100vh - 220px); }
     .timeline { min-width: calc(var(--label) + var(--weeks) * var(--week)); }
     .timeline-row { display: grid; grid-template-columns: var(--label) repeat(var(--weeks), var(--week)); min-height: 36px; border-bottom: 1px solid #d9e2e7; }
@@ -164,6 +169,10 @@
     [data-theme="dark"] .btn:hover { background: #273943; }
     [data-theme="dark"] .btn-primary { color: #fff; background: #1785b5; border-color: #1785b5; }
     [data-theme="dark"] .btn-danger { color: #ffaaaa; border-color: #874b4b; }
+    [data-theme="dark"] .view-switch { background: #172229; border-color: #53656f; }
+    [data-theme="dark"] .view-option { color: #b8c7ce; }
+    [data-theme="dark"] .view-option:hover { background: #273943; }
+    [data-theme="dark"] .view-option[aria-pressed="true"] { color: #fff; background: #1785b5; }
     [data-theme="dark"] .btn-dark { color: #fff; background: transparent; border-color: #5d707b; }
     [data-theme="dark"] .theme-option[aria-pressed="true"] { color: #eaf2f5; background: #2b718f; }
     [data-theme="dark"] .holiday-check,
@@ -294,6 +303,13 @@
         </div>
       </section>
       <section class="riskbar" id="riskBar"><strong>Risco</strong><span id="riskBarText"></span><button id="editRisk" aria-label="Editar risco">✎</button></section>
+      <section class="view-toolbar" aria-label="Visualização do cronograma">
+        <div class="view-switch" role="group" aria-label="Escala de tempo">
+          <button class="view-option" id="viewWeek" type="button" aria-pressed="true">Semanal</button>
+          <button class="view-option" id="viewMonth" type="button" aria-pressed="false">Mensal</button>
+          <button class="view-option" id="viewQuarter" type="button" aria-pressed="false">Trimestral</button>
+        </div>
+      </section>
       <section class="timeline-shell" aria-label="Cronograma semanal"><div class="timeline" id="timeline"></div></section>
     </main>
   </div>
@@ -388,6 +404,7 @@
     projects.forEach(syncProjectRange);
     const escapeHtml = value => String(value).replace(/[&<>'"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c]));
     let dirtyTimer;
+    let timelineView = ["week","month","quarter"].includes(localStorage.getItem("cronograma-timeline-view")) ? localStorage.getItem("cronograma-timeline-view") : "week";
 
     function setTheme(theme) {
       const selected = theme === "dark" ? "dark" : "light";
@@ -433,8 +450,7 @@
       }
       return found.sort((a,b) => a.date - b.date);
     }
-    function weekBusinessInfo(start, rangeStart, rangeEnd) {
-      const first = start > rangeStart ? start : rangeStart; const weekEnd = addDays(start, 6); const last = weekEnd < rangeEnd ? weekEnd : rangeEnd;
+    function businessInfoBetween(first, last) {
       if (first > last) return { holidays: [], businessDays: 0 };
       let weekdays = 0;
       for (let date = new Date(first); date <= last; date.setDate(date.getDate() + 1)) if (date.getDay() >= 1 && date.getDay() <= 5) weekdays++;
@@ -445,6 +461,29 @@
       const months = []; const cursor = new Date(start.getFullYear(), start.getMonth(), 1, 12);
       while (cursor <= end) { months.push(new Date(cursor)); cursor.setMonth(cursor.getMonth() + 1); }
       return months;
+    }
+    function shortMonth(date) { return new Intl.DateTimeFormat("pt-BR", { month:"short" }).format(date).replace(".","").toUpperCase(); }
+    function timelinePeriods(p, mode) {
+      const rangeStart=dateFromInput(p.startDate),rangeEnd=dateFromInput(p.endDate),timelineStart=monday(p.startDate),periods=[];
+      const addPeriod=(calendarStart,calendarEnd,label,ariaLabel,groupKey,groupLabel)=>{
+        const first=calendarStart>rangeStart?calendarStart:rangeStart,last=calendarEnd<rangeEnd?calendarEnd:rangeEnd;
+        const startWeek=clamp(Math.floor((first-timelineStart)/(86400000*7)),0,p.weeks-1),endWeek=clamp(Math.floor((last-timelineStart)/(86400000*7)),0,p.weeks-1);
+        periods.push({first,last,startWeek,endWeek,label,ariaLabel,groupKey,groupLabel,...businessInfoBetween(first,last)});
+      };
+      if(mode==="week"){
+        for(let index=0;index<p.weeks;index++){const start=addDays(timelineStart,index*7);addPeriod(start,addDays(start,6),`S${isoWeek(start)}<br>${String(start.getDate()).padStart(2,"0")}/${String(start.getMonth()+1).padStart(2,"0")}`,`Semana ${isoWeek(start)}`,`${start.getFullYear()}-${start.getMonth()}`,`${monthName(start)} ${start.getFullYear()}`);}
+      }else if(mode==="month"){
+        monthsBetween(rangeStart,rangeEnd).forEach(month=>{const last=new Date(month.getFullYear(),month.getMonth()+1,0,12);addPeriod(month,last,shortMonth(month),`${monthName(month)} de ${month.getFullYear()}`,String(month.getFullYear()),String(month.getFullYear()));});
+      }else{
+        const cursor=new Date(rangeStart.getFullYear(),Math.floor(rangeStart.getMonth()/3)*3,1,12);
+        while(cursor<=rangeEnd){const quarter=Math.floor(cursor.getMonth()/3)+1,last=new Date(cursor.getFullYear(),cursor.getMonth()+3,0,12);addPeriod(new Date(cursor),last,`T${quarter}<br>${shortMonth(cursor)}–${shortMonth(last)}`,`${quarter}º trimestre de ${cursor.getFullYear()}`,String(cursor.getFullYear()),String(cursor.getFullYear()));cursor.setMonth(cursor.getMonth()+3);}
+      }
+      return periods;
+    }
+    function periodSegments(periods) {
+      const segments=[];
+      periods.forEach((period,index)=>{const last=segments.at(-1);if(last&&last.key===period.groupKey)last.count++;else segments.push({key:period.groupKey,label:period.groupLabel,count:1,start:index});});
+      return segments;
     }
     function businessDaysForMonth(month) {
       const first = new Date(month.getFullYear(), month.getMonth(), 1, 12);
@@ -488,25 +527,20 @@
       $("projectList").innerHTML = projects.map(p => `<button class="project-item ${p.id===currentId?"active":""}" data-project="${p.id}"><strong>${escapeHtml(p.name)}</strong><span>${durationWeeksForRange(p.startDate,p.endDate)} semanas · ${escapeHtml(p.version || "Sem versão")}</span></button>`).join("");
       document.querySelectorAll("[data-project]").forEach(btn => btn.onclick = () => { currentId = btn.dataset.project; setInputs(); render(); save(); });
     }
-    function monthSegments(weeks) {
-      const segments = [];
-      weeks.forEach((w, index) => { const key = `${w.getFullYear()}-${w.getMonth()}`; const last = segments.at(-1); if (last && last.key === key) last.count++; else segments.push({ key, name: monthName(w), count:1, start:index }); });
-      return segments;
-    }
     function renderTimeline() {
-      const p = project(); document.documentElement.style.setProperty("--weeks", p.weeks);
-      const rangeStart = dateFromInput(p.startDate); const rangeEnd = dateFromInput(p.endDate); const first = monday(p.startDate); const weeks = Array.from({length:p.weeks}, (_,i) => addDays(first, i*7));
-      const weekInfoMap = weeks.map(week => weekBusinessInfo(week, rangeStart, rangeEnd)); const holidayMap = weekInfoMap.map(info => info.holidays); const timeline = $("timeline");
-      const months = monthSegments(weeks).map(s => `<div class="month" style="grid-column:${s.start+2} / span ${s.count}">${escapeHtml(s.name)} ${weeks[s.start].getFullYear()}</div>`).join("");
-      let html = `<div class="timeline-row month-row"><div class="sticky-label"></div>${months}</div>`;
-      html += `<div class="timeline-row week-row"><div class="sticky-label">Atividade / Semana ISO</div>${weeks.map(w => `<div class="week-head">S${isoWeek(w)}<br>${String(w.getDate()).padStart(2,"0")}/${String(w.getMonth()+1).padStart(2,"0")}</div>`).join("")}</div>`;
-      html += `<div class="timeline-row days-row"><div class="sticky-label">Dias úteis (* feriado nacional)</div>${weeks.map((w,i) => { const info=weekInfoMap[i],holidays=info.holidays; const title=holidays.map(h=>`${h.name} (${formatDate(h.date)})`).join(" · "); return `<div class="day-cell ${holidays.length?"holiday":""}" ${title?`title="${escapeHtml(title)}"`:""}>${info.businessDays}${holidays.length?"*":""}</div>`; }).join("")}</div>`;
+      const p=project(),periods=timelinePeriods(p,timelineView),timeline=$("timeline"),columnWidth=timelineView==="week"?68:timelineView==="month"?106:154;
+      document.documentElement.style.setProperty("--weeks",periods.length); document.documentElement.style.setProperty("--week",`${columnWidth}px`);
+      const scaleLabel=timelineView==="week"?"Semana ISO":timelineView==="month"?"Mês":"Trimestre";
+      const groups=periodSegments(periods).map(segment=>`<div class="month" style="grid-column:${segment.start+2} / span ${segment.count}">${escapeHtml(segment.label)}</div>`).join("");
+      let html=`<div class="timeline-row month-row"><div class="sticky-label"></div>${groups}</div>`;
+      html+=`<div class="timeline-row week-row"><div class="sticky-label">Atividade / ${scaleLabel}</div>${periods.map(period=>`<div class="week-head">${period.label}</div>`).join("")}</div>`;
+      html+=`<div class="timeline-row days-row"><div class="sticky-label">Dias úteis (* feriado nacional)</div>${periods.map(period=>{const title=period.holidays.map(h=>`${h.name} (${formatDate(h.date)})`).join(" · ");return `<div class="day-cell ${period.holidays.length?"holiday":""}" ${title?`title="${escapeHtml(title)}"`:""}>${period.businessDays}${period.holidays.length?"*":""}</div>`;}).join("")}</div>`;
       p.modules.forEach((module, moduleIndex) => {
         html += `<div class="timeline-row"><div class="module-head" style="--module-color:${module.color}"><button data-collapse="${module.id}" aria-label="${module.collapsed?"Expandir":"Recolher"} módulo">${module.collapsed?"＋":"−"}</button><strong>${escapeHtml(module.code)} · ${escapeHtml(module.name)}</strong><span>${module.activities.length} atividades</span><div class="module-actions"><button data-add="${module.id}" title="Adicionar atividade" aria-label="Adicionar atividade">＋</button><button data-edit-module="${module.id}" title="Editar módulo" aria-label="Editar módulo">✎</button><button data-duplicate-module="${module.id}" title="Duplicar módulo" aria-label="Duplicar módulo">⧉</button><button data-remove-module="${module.id}" title="Excluir módulo" aria-label="Excluir módulo">×</button></div></div></div>`;
         if (!module.collapsed) {
           module.activities.forEach(activity => {
             const color = activity.color || TYPES[activity.type]?.color || module.color;
-            html += `<div class="timeline-row activity" style="--module-color:${module.color};--activity-color:${color}"><div class="sticky-label activity-label"><span class="activity-code">${escapeHtml(module.code)}</span><input class="activity-name" data-name="${module.id}|${activity.id}" value="${escapeHtml(activity.name)}" aria-label="Nome da atividade"><button class="remove-activity" data-remove="${module.id}|${activity.id}" aria-label="Excluir atividade">×</button></div>${weeks.map((w,i) => `<button class="slot ${i>=activity.start&&i<=activity.end?"active":""} ${holidayMap[i].length?"holiday-column":""}" data-slot="${module.id}|${activity.id}|${i}" aria-label="Semana ${isoWeek(w)}: ${i>=activity.start&&i<=activity.end?"ativa":"inativa"}"></button>`).join("")}</div>`;
+            html += `<div class="timeline-row activity" style="--module-color:${module.color};--activity-color:${color}"><div class="sticky-label activity-label"><span class="activity-code">${escapeHtml(module.code)}</span><input class="activity-name" data-name="${module.id}|${activity.id}" value="${escapeHtml(activity.name)}" aria-label="Nome da atividade"><button class="remove-activity" data-remove="${module.id}|${activity.id}" aria-label="Excluir atividade">×</button></div>${periods.map(period=>{const active=activity.start<=period.endWeek&&activity.end>=period.startWeek;return `<button class="slot ${active?"active":""} ${period.holidays.length?"holiday-column":""}" data-slot="${module.id}|${activity.id}|${period.startWeek}|${period.endWeek}" aria-label="${escapeHtml(period.ariaLabel)}: ${active?"ativa":"inativa"}"></button>`;}).join("")}</div>`;
           });
           html += `<div class="add-activity-row"><div class="sticky-label"><button class="btn" data-add="${module.id}">＋ Adicionar atividade</button></div><div></div></div>`;
         }
@@ -552,10 +586,13 @@
       modules.splice(sourceIndex + 1, 0, copy); markDirty(); render(); notify("Módulo duplicado com todas as atividades.");
     }
     function toggleSlot(value) {
-      const [mid,aid,indexText]=value.split("|"); const index=Number(indexText); const a=project().modules.find(x=>x.id===mid).activities.find(x=>x.id===aid);
-      if (index < a.start || index > a.end) { if (index < a.start) a.start=index; else a.end=index; }
-      else if (a.start===a.end) { a.start=0; a.end=-1; }
-      else if (index===a.start) a.start++; else if (index===a.end) a.end--; else { a.start=index; }
+      const [mid,aid,startText,endText]=value.split("|"); const periodStart=Number(startText),periodEnd=Number(endText??startText); const a=project().modules.find(x=>x.id===mid).activities.find(x=>x.id===aid);
+      const overlaps=a.start<=periodEnd&&a.end>=periodStart;
+      if(!overlaps){if(a.end<a.start){a.start=periodStart;a.end=periodEnd;}else if(periodEnd<a.start)a.start=periodStart;else a.end=periodEnd;}
+      else if(periodStart<=a.start&&periodEnd>=a.end){a.start=0;a.end=-1;}
+      else if(periodStart<=a.start)a.start=clamp(periodEnd+1,0,project().weeks-1);
+      else if(periodEnd>=a.end)a.end=periodStart-1;
+      else a.end=periodStart-1;
       markDirty(); renderTimeline();
     }
     function addActivity(moduleId) {
@@ -623,6 +660,10 @@
     $("saveProject").onclick=()=>save(true);
     $("lightTheme").onclick=()=>setTheme("light");
     $("darkTheme").onclick=()=>setTheme("dark");
+    function setTimelineView(mode,shouldRender=true) { timelineView=["week","month","quarter"].includes(mode)?mode:"week"; localStorage.setItem("cronograma-timeline-view",timelineView); $("viewWeek").setAttribute("aria-pressed",String(timelineView==="week")); $("viewMonth").setAttribute("aria-pressed",String(timelineView==="month")); $("viewQuarter").setAttribute("aria-pressed",String(timelineView==="quarter")); document.querySelector(".timeline-shell").setAttribute("aria-label",timelineView==="week"?"Cronograma semanal":timelineView==="month"?"Cronograma mensal":"Cronograma trimestral"); if(shouldRender)renderTimeline(); }
+    $("viewWeek").onclick=()=>setTimelineView("week");
+    $("viewMonth").onclick=()=>setTimelineView("month");
+    $("viewQuarter").onclick=()=>setTimelineView("quarter");
     function setSidebarCollapsed(collapsed) { $("workspace").classList.toggle("sidebar-collapsed",collapsed); $("sidebarToggle").setAttribute("aria-expanded",String(!collapsed)); $("sidebarToggle").setAttribute("aria-label",collapsed?"Exibir painel lateral":"Recolher painel lateral"); $("sidebarToggle").title=collapsed?"Exibir painel lateral":"Recolher painel lateral"; localStorage.setItem("cronograma-sidebar-collapsed",String(collapsed)); }
     $("sidebarToggle").onclick=()=>setSidebarCollapsed(!$("workspace").classList.contains("sidebar-collapsed"));
     $("newProject").onclick=()=>{ const p=defaultProject(); p.name="Novo projeto de rollout"; p.version="V1"; p.risk=""; projects.push(p); currentId=p.id; setInputs(); save(); render(); notify("Novo projeto criado."); };
@@ -640,7 +681,7 @@
     $("newActivityType").innerHTML=Object.entries(TYPES).map(([value,type])=>`<option value="${value}">${escapeHtml(type.label)}</option>`).join("");
     $("newActivityType").onchange=()=>{ $("newActivityColor").value=TYPES[$("newActivityType").value].color; };
     $("confirmActivity").onclick=event=>{ event.preventDefault(); const name=$("newActivityName").value.trim(); const moduleId=$("activityModuleId").value; const module=project().modules.find(item=>item.id===moduleId); if(!name||!module)return; module.activities.push({id:crypto.randomUUID(),name,type:$("newActivityType").value,color:$("newActivityColor").value,start:0,end:0}); $("activityDialog").close(); markDirty(); render(); notify("Atividade adicionada com cor personalizada."); };
-    setTheme(document.documentElement.dataset.theme); setSidebarCollapsed(localStorage.getItem("cronograma-sidebar-collapsed")==="true"); setInputs(); render(); save();
+    setTheme(document.documentElement.dataset.theme); setTimelineView(timelineView,false); setSidebarCollapsed(localStorage.getItem("cronograma-sidebar-collapsed")==="true"); setInputs(); render(); save();
   </script>
 </body>
 </html>
