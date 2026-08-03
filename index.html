@@ -145,6 +145,12 @@
     .dialog-body { padding: 18px; }
     .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 18px; border-top: 1px solid #d7e0e5; background: #f4f7f8; }
     .close-dialog { border: 0; background: transparent; color: #fff; font-size: 20px; }
+    .owner-picker { display: grid; grid-template-columns: minmax(0, 1fr) 36px; gap: 7px; }
+    .owner-picker .btn { width: 36px; min-height: 36px; padding: 0; font-size: 18px; }
+    .custom-owner-fields { display: grid; grid-template-columns: minmax(0, 1fr) 74px auto; align-items: end; gap: 9px; margin-top: 10px; padding: 11px; border: 1px solid #ccd8de; background: #f4f7f8; }
+    .custom-owner-fields[hidden] { display: none; }
+    .custom-owner-fields .field { margin: 0; }
+    .custom-owner-fields input[type="color"] { min-height: 36px; padding: 3px; }
     .hidden-input { display: none; }
     [data-theme="dark"] { color-scheme: dark; }
     [data-theme="dark"] body { color: #e5edf1; background: #10171c; }
@@ -213,6 +219,7 @@
     [data-theme="dark"] .empty-risk span { color: #f4ce91; }
     [data-theme="dark"] dialog { color: #e5edf1; background: #172229; }
     [data-theme="dark"] .dialog-actions { background: #111b21; border-color: #34454e; }
+    [data-theme="dark"] .custom-owner-fields { background: #111b21; border-color: #34454e; }
     [data-theme="dark"] .toast { background: #27617b; }
     @media (max-width: 980px) {
       .workspace { grid-template-columns: 1fr; }
@@ -236,6 +243,8 @@
       .metrics { margin-top: 12px; overflow: auto; }
       .metric { min-width: 82px; }
       .theme-switch { margin-left: auto; }
+      .custom-owner-fields { grid-template-columns: 1fr 74px; }
+      .custom-owner-fields .btn { grid-column: 1 / -1; }
       :root { --label: 235px; --week: 58px; }
     }
     @media print {
@@ -334,7 +343,15 @@
       <div class="dialog-body">
         <input id="activityModuleId" type="hidden" />
         <div class="field"><label for="newActivityName">Nome da atividade</label><input id="newActivityName" required placeholder="Ex.: Preparação do ambiente" /></div>
-        <div class="field"><label for="newActivityOwner">Responsável</label><select id="newActivityOwner"></select></div>
+        <div class="field">
+          <label for="newActivityOwner">Responsável</label>
+          <div class="owner-picker"><select id="newActivityOwner"></select><button class="btn" id="addOwnerOption" type="button" title="Criar novo responsável" aria-label="Criar novo responsável">＋</button></div>
+          <div class="custom-owner-fields" id="customOwnerFields" hidden>
+            <div class="field"><label for="newOwnerName">Nome</label><input id="newOwnerName" placeholder="Ex.: Consultoria" /></div>
+            <div class="field"><label for="newOwnerColor">Cor</label><input id="newOwnerColor" type="color" value="#5b6670" /></div>
+            <button class="btn btn-primary" id="confirmNewOwner" type="button">Adicionar</button>
+          </div>
+        </div>
       </div>
       <div class="dialog-actions"><button class="btn" value="cancel">Cancelar</button><button class="btn btn-primary" id="confirmActivity" value="default">Adicionar</button></div>
     </form>
@@ -438,9 +455,16 @@
     function syncProjectRange(item) {
       item.endDate = /^\d{4}-\d{2}-\d{2}$/.test(item.endDate || "") ? item.endDate : deriveEndDate(item.startDate, item.weeks);
       item.weeks = clamp(timelineWeeksForRange(item.startDate, item.endDate), 1, 104);
-      item.modules?.forEach(module => module.activities?.forEach(activity => activity.owner = OWNERS[activity.owner] ? activity.owner : inferOwner(activity)));
+      item.owners = normalizeOwnerList(item.owners); const owners = ownerCatalog(item);
+      item.modules?.forEach(module => module.activities?.forEach(activity => activity.owner = owners[activity.owner] ? activity.owner : inferOwner(activity)));
       return item;
     }
+    function normalizeOwnerList(items) {
+      if (!Array.isArray(items)) return [];
+      const seen = new Set(Object.keys(OWNERS));
+      return items.filter(item => item && typeof item === "object" && typeof item.id === "string" && typeof item.label === "string" && /^#[0-9a-f]{6}$/i.test(item.color || "") && !seen.has(item.id) && seen.add(item.id)).map(item => ({ id:item.id, label:item.label.trim() || "Responsável personalizado", color:item.color, fill:item.color }));
+    }
+    function ownerCatalog(item) { return Object.fromEntries([...Object.entries(OWNERS), ...normalizeOwnerList(item?.owners).map(owner => [owner.id, owner])]); }
     function inferOwner(activity) {
       const text = `${activity?.name || ""} ${activity?.type || ""}`.toLocaleLowerCase("pt-BR");
       if (/\bts\b|t-systems|t systems|desenvolvimento/.test(text)) return "tsystems";
@@ -537,7 +561,7 @@
       document.querySelectorAll("[data-project]").forEach(btn => btn.onclick = () => { currentId = btn.dataset.project; setInputs(); render(); save(); });
     }
     function renderTimeline() {
-      const p=project(),periods=timelinePeriods(p,timelineView),timeline=$("timeline"),columnWidth=timelineView==="week"?68:timelineView==="month"?106:154;
+      const p=project(),owners=ownerCatalog(p),periods=timelinePeriods(p,timelineView),timeline=$("timeline"),columnWidth=timelineView==="week"?68:timelineView==="month"?106:154;
       document.documentElement.style.setProperty("--weeks",periods.length); document.documentElement.style.setProperty("--week",`${columnWidth}px`);
       const scaleLabel=timelineView==="week"?"Semana ISO":timelineView==="month"?"Mês":"Trimestre";
       const groups=periodSegments(periods).map(segment=>`<div class="month" style="grid-column:${segment.start+2} / span ${segment.count}">${escapeHtml(segment.label)}</div>`).join("");
@@ -548,13 +572,13 @@
         html += `<div class="timeline-row"><div class="module-head" style="--module-color:${module.color}"><button data-collapse="${module.id}" aria-label="${module.collapsed?"Expandir":"Recolher"} módulo">${module.collapsed?"＋":"−"}</button><strong>${escapeHtml(module.code)} · ${escapeHtml(module.name)}</strong><span>${module.activities.length} atividades</span><div class="module-actions"><button data-add="${module.id}" title="Adicionar atividade" aria-label="Adicionar atividade">＋</button><button data-edit-module="${module.id}" title="Editar módulo" aria-label="Editar módulo">✎</button><button data-duplicate-module="${module.id}" title="Duplicar módulo" aria-label="Duplicar módulo">⧉</button><button data-remove-module="${module.id}" title="Excluir módulo" aria-label="Excluir módulo">×</button></div></div></div>`;
         if (!module.collapsed) {
           module.activities.forEach(activity => {
-            const ownerKey = OWNERS[activity.owner] ? activity.owner : inferOwner(activity); const owner = OWNERS[ownerKey];
+            const ownerKey = owners[activity.owner] ? activity.owner : inferOwner(activity); const owner = owners[ownerKey];
             html += `<div class="timeline-row activity" style="--module-color:${module.color};--activity-color:${owner.color};--activity-fill:${owner.fill}"><div class="sticky-label activity-label"><span class="activity-code">${escapeHtml(module.code)}</span><input class="activity-name" data-name="${module.id}|${activity.id}" value="${escapeHtml(activity.name)}" aria-label="Nome da atividade"><button class="remove-activity" data-remove="${module.id}|${activity.id}" aria-label="Excluir atividade">×</button></div>${periods.map(period=>{const active=activity.start<=period.endWeek&&activity.end>=period.startWeek;return `<button class="slot ${active?"active":""} ${period.holidays.length?"holiday-column":""}" data-slot="${module.id}|${activity.id}|${period.startWeek}|${period.endWeek}" aria-label="${escapeHtml(period.ariaLabel)}: ${active?"ativa":"inativa"}; ${escapeHtml(owner.label)}"></button>`;}).join("")}</div>`;
           });
           html += `<div class="add-activity-row"><div class="sticky-label"><button class="btn" data-add="${module.id}">＋ Adicionar atividade</button></div><div></div></div>`;
         }
       });
-      html += `<div class="legend">${Object.values(OWNERS).map(owner => `<span class="legend-item"><i class="swatch" style="--swatch:${owner.color};--swatch-fill:${owner.fill}"></i>${escapeHtml(owner.label)}</span>`).join("")}<button class="btn" id="addModule">＋ Adicionar módulo</button></div>`;
+      html += `<div class="legend">${Object.values(owners).map(owner => `<span class="legend-item"><i class="swatch" style="--swatch:${owner.color};--swatch-fill:${owner.fill}"></i>${escapeHtml(owner.label)}</span>`).join("")}<button class="btn" id="addModule">＋ Adicionar módulo</button></div>`;
       timeline.innerHTML = html;
       wireTimelineEvents();
     }
@@ -602,9 +626,14 @@
     function addActivity(moduleId) {
       $("activityModuleId").value = moduleId;
       $("newActivityName").value = "";
-      $("newActivityOwner").value = "yamaha";
+      populateOwnerOptions("yamaha"); $("customOwnerFields").hidden = true; $("newOwnerName").value = ""; $("newOwnerColor").value = "#5b6670";
       $("activityDialog").showModal();
       setTimeout(() => $("newActivityName").focus(), 0);
+    }
+    function populateOwnerOptions(selected = "yamaha") {
+      const owners = ownerCatalog(project());
+      $("newActivityOwner").innerHTML = Object.entries(owners).map(([value,owner]) => `<option value="${escapeHtml(value)}">${escapeHtml(owner.label)}</option>`).join("");
+      $("newActivityOwner").value = owners[selected] ? selected : "yamaha";
     }
     function render() {
       const p=syncProjectRange(project()); const first=dateFromInput(p.startDate); const last=dateFromInput(p.endDate); const durationWeeks=durationWeeksForRange(p.startDate,p.endDate);
@@ -621,6 +650,7 @@
       const endDate = /^\d{4}-\d{2}-\d{2}$/.test(source.endDate || "") ? source.endDate : deriveEndDate(source.startDate, source.weeks);
       if (dateFromInput(endDate) < dateFromInput(source.startDate)) throw new Error("Período inválido");
       const weeks = clamp(timelineWeeksForRange(source.startDate, endDate), 1, 104);
+      const owners = normalizeOwnerList(source.owners); const importedOwnerIds = new Set([...Object.keys(OWNERS), ...owners.map(owner => owner.id)]);
       const modules = source.modules.map((module, moduleIndex) => {
         if (!module || typeof module !== "object" || !Array.isArray(module.activities)) throw new Error("Módulo inválido");
         return {
@@ -633,7 +663,7 @@
             id: crypto.randomUUID(),
             name: String(activity?.name || "Atividade sem nome"),
             type: TYPES[activity?.type] ? activity.type : "detail",
-            owner: OWNERS[activity?.owner] ? activity.owner : inferOwner(activity),
+            owner: importedOwnerIds.has(activity?.owner) ? activity.owner : inferOwner(activity),
             color: /^#[0-9a-f]{6}$/i.test(activity?.color || "") ? activity.color : undefined,
             start: clamp(Number(activity?.start) || 0, 0, weeks - 1),
             end: clamp(Number.isFinite(Number(activity?.end)) ? Number(activity.end) : 0, -1, weeks - 1)
@@ -648,6 +678,7 @@
         weeks,
         version: String(source.version || "V1"),
         risk: String(source.risk || ""),
+        owners,
         modules
       };
     }
@@ -682,8 +713,10 @@
     $("importProjectTop").onclick=openImport;
     $("importFile").onchange=async event=>{ try{const payload=JSON.parse(await event.target.files[0].text()); const imported=normalizeImportedProject(payload); projects.push(imported); currentId=imported.id; setInputs(); save(); render(); notify("Arquivo importado com sucesso.");}catch{notify("Arquivo incompatível ou inválido.");} event.target.value=""; };
     $("confirmModule").onclick=event=>{ event.preventDefault(); const name=$("moduleName").value.trim(),code=$("moduleCode").value.trim(),editId=$("moduleEditId").value; if(!name||!code)return; const existing=editId?project().modules.find(module=>module.id===editId):null; if(existing){existing.name=name;existing.code=code;existing.color=$("moduleColor").value;}else{project().modules.push({id:crypto.randomUUID(),code,name,color:$("moduleColor").value,collapsed:false,activities:[]});} $("moduleDialog").close(); $("moduleForm").reset(); markDirty(); render(); notify(existing?"Módulo atualizado.":"Módulo adicionado."); };
-    $("newActivityOwner").innerHTML=Object.entries(OWNERS).map(([value,owner])=>`<option value="${value}">${escapeHtml(owner.label)}</option>`).join("");
+    $("addOwnerOption").onclick=()=>{ $("customOwnerFields").hidden=!$("customOwnerFields").hidden; if(!$("customOwnerFields").hidden)setTimeout(()=>$("newOwnerName").focus(),0); };
+    $("confirmNewOwner").onclick=()=>{ const label=$("newOwnerName").value.trim(),color=$("newOwnerColor").value; if(!label){$("newOwnerName").focus();notify("Informe o nome do novo responsável.");return;} const owners=ownerCatalog(project()); const duplicate=Object.entries(owners).find(([,owner])=>owner.label.toLocaleLowerCase("pt-BR")===label.toLocaleLowerCase("pt-BR")); if(duplicate){populateOwnerOptions(duplicate[0]);$("customOwnerFields").hidden=true;notify("Esse responsável já existe e foi selecionado.");return;} const owner={id:`custom-${crypto.randomUUID()}`,label,color,fill:color}; project().owners=normalizeOwnerList([...(project().owners||[]),owner]); populateOwnerOptions(owner.id); $("customOwnerFields").hidden=true; $("newOwnerName").value=""; markDirty(); notify("Novo responsável adicionado ao índice."); };
     $("confirmActivity").onclick=event=>{ event.preventDefault(); const name=$("newActivityName").value.trim(); const moduleId=$("activityModuleId").value; const module=project().modules.find(item=>item.id===moduleId); if(!name||!module)return; module.activities.push({id:crypto.randomUUID(),name,type:"detail",owner:$("newActivityOwner").value,start:0,end:0}); $("activityDialog").close(); markDirty(); render(); notify("Atividade adicionada com o responsável selecionado."); };
+    document.querySelectorAll(".close-dialog").forEach(button=>button.onclick=event=>{ event.preventDefault(); const dialog=button.closest("dialog"); if(dialog?.open)dialog.close("cancel"); });
     setTheme(document.documentElement.dataset.theme); setTimelineView(timelineView,false); setSidebarCollapsed(localStorage.getItem("cronograma-sidebar-collapsed")==="true"); setInputs(); render(); save();
   </script>
 </body>
