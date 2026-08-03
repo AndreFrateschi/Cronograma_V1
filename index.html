@@ -21,6 +21,8 @@
     button, input, select, textarea { font: inherit; }
     button { cursor: pointer; }
     .appbar { height: 64px; display: flex; align-items: center; gap: 18px; padding: 0 22px; color: #fff; background: var(--navy); border-bottom: 4px solid #1b607d; }
+    .sidebar-toggle { width: 34px; height: 34px; flex: 0 0 34px; border: 1px solid #5d707b; border-radius: 5px; padding: 0; background: transparent; color: #fff; font-size: 18px; }
+    .sidebar-toggle:hover { background: rgba(255,255,255,.1); }
     .brand { display: flex; align-items: center; gap: 11px; min-width: 210px; }
     .brand-mark { width: 30px; height: 30px; display: grid; place-items: center; border: 2px solid #fff; color: #fff; font-weight: 800; }
     .brand strong { display: block; font-size: 15px; }
@@ -43,12 +45,15 @@
     .btn-danger { border-color: #e4b4b4; color: #a62323; }
     .icon { width: 18px; text-align: center; font-size: 16px; line-height: 1; }
     .workspace { display: grid; grid-template-columns: 286px minmax(0, 1fr); min-height: calc(100vh - 64px); }
+    .workspace.sidebar-collapsed { grid-template-columns: minmax(0, 1fr); }
+    .workspace.sidebar-collapsed .sidebar { display: none; }
     .sidebar { padding: 18px; background: #e8eef1; border-right: 1px solid #cbd6dc; overflow-y: auto; }
     .side-title { margin: 0 0 15px; display: flex; align-items: center; justify-content: space-between; font-size: 15px; }
     .field { display: grid; gap: 6px; margin-bottom: 13px; }
     .field label { color: #4d606b; font-size: 12px; font-weight: 700; }
     .field input, .field select, .field textarea { width: 100%; border: 1px solid #b9c7ce; border-radius: 5px; padding: 9px 10px; color: var(--ink); background: #fff; }
     .field textarea { min-height: 70px; resize: vertical; }
+    .range-summary { margin: -5px 0 13px; color: var(--muted); font-size: 11px; }
     .field-row { display: grid; grid-template-columns: 1fr 92px; gap: 10px; }
     .holiday-check { margin: 14px 0 4px; padding: 11px; border: 1px solid #c7d4da; border-left: 4px solid #d88a12; background: #fff; }
     .holiday-check-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
@@ -151,6 +156,7 @@
     [data-theme="dark"] .holiday-check-head span,
     [data-theme="dark"] .holiday-item small,
     [data-theme="dark"] .holiday-empty { color: #9eb0ba; }
+    [data-theme="dark"] .range-summary { color: #9eb0ba; }
     [data-theme="dark"] .field input,
     [data-theme="dark"] .field select,
     [data-theme="dark"] .field textarea { color: #e8f0f4; background: #0f181e; border-color: #43545e; }
@@ -235,6 +241,7 @@
 </head>
 <body>
   <header class="appbar">
+    <button class="sidebar-toggle" id="sidebarToggle" type="button" title="Recolher painel lateral" aria-label="Recolher painel lateral" aria-expanded="true">☰</button>
     <div class="brand"><div class="brand-mark">C</div><div><strong>Cronograma de Projetos</strong><span>Planejamento e acompanhamento</span></div></div>
     <div class="project-heading"><strong id="barProjectName">Rollout Yamaha DDC/Data Lake</strong><span id="barPeriod">18 semanas</span></div>
     <div class="toolbar">
@@ -249,14 +256,15 @@
     </div>
   </header>
 
-  <div class="workspace">
+  <div class="workspace" id="workspace">
     <aside class="sidebar">
       <h2 class="side-title">Configuração <span id="saveState">Salvo</span></h2>
       <div class="sidebar-fields">
         <div class="field"><label for="projectName">Nome do projeto</label><input id="projectName" /></div>
         <div class="field"><label for="startDate">Início</label><input id="startDate" type="date" required /></div>
-        <div class="field"><label for="weekCount">Semanas</label><input id="weekCount" type="number" min="4" max="40" /></div>
+        <div class="field"><label for="endDate">Fim</label><input id="endDate" type="date" required /></div>
       </div>
+      <p class="range-summary" id="rangeSummary"></p>
       <div class="field"><label for="version">Versão</label><input id="version" placeholder="V1" /></div>
       <div class="field"><label for="riskText">Risco crítico</label><textarea id="riskText" placeholder="Descreva o risco ou deixe em branco"></textarea></div>
       <section class="holiday-check" aria-live="polite">
@@ -280,6 +288,7 @@
         <div class="metrics" aria-label="Resumo do projeto">
           <div class="metric"><span>Módulos</span><strong id="moduleMetric">2</strong></div>
           <div class="metric"><span>Atividades</span><strong id="activityMetric">0</strong></div>
+          <div class="metric"><span>Semanas no período</span><strong id="weekMetric">0</strong></div>
           <div class="metric"><span>Go Lives</span><strong id="goLiveMetric">0</strong></div>
           <div class="metric"><span>Feriados úteis</span><strong id="holidayMetric">0</strong></div>
         </div>
@@ -363,7 +372,7 @@
       ["Hypercare","hypercare",13+offset,17+offset],["Reforço de processos e/ou capacitação (GMO)","hypercare",13+offset,14+offset]
     ].map(([name,type,start,end], i) => ({ id: code+"-"+i+"-"+Date.now(), name, type, start, end }));
     const defaultProject = () => ({
-      id: crypto.randomUUID(), name: "Rollout Yamaha DDC/Data Lake", startDate: "2026-07-13", weeks: 18, version: "V2",
+      id: crypto.randomUUID(), name: "Rollout Yamaha DDC/Data Lake", startDate: "2026-07-13", endDate: "2026-11-15", weeks: 18, version: "V2",
       risk: "Não entrega das informações a monitorar via DDC (Módulo 1) — dependência crítica para o Go Live.",
       modules: [
         { id: crypto.randomUUID(), code: "M1", name: "MONITORAMENTO E VISUALIZAÇÃO DE DCs 01 A 05 + MOLDES", color: "#1d63b7", collapsed: false, activities: seedActivities("M1") },
@@ -376,6 +385,7 @@
     const $ = id => document.getElementById(id);
     const project = () => projects.find(p => p.id === currentId);
     const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+    projects.forEach(syncProjectRange);
     const escapeHtml = value => String(value).replace(/[&<>'"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c]));
     let dirtyTimer;
 
@@ -401,6 +411,16 @@
       return d;
     }
     function addDays(date, days) { const d = new Date(date); d.setDate(d.getDate() + days); return d; }
+    function dateFromInput(value) { return new Date(value + "T12:00:00"); }
+    function toInputDate(date) { return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`; }
+    function deriveEndDate(startDate, weeks) { return toInputDate(addDays(monday(startDate), (clamp(Number(weeks)||18, 1, 104) * 7) - 1)); }
+    function timelineWeeksForRange(startDate, endDate) { return Math.ceil(((dateFromInput(endDate) - monday(startDate)) / 86400000 + 1) / 7); }
+    function durationWeeksForRange(startDate, endDate) { return Math.ceil(((dateFromInput(endDate) - dateFromInput(startDate)) / 86400000 + 1) / 7); }
+    function syncProjectRange(item) {
+      item.endDate = /^\d{4}-\d{2}-\d{2}$/.test(item.endDate || "") ? item.endDate : deriveEndDate(item.startDate, item.weeks);
+      item.weeks = clamp(timelineWeeksForRange(item.startDate, item.endDate), 1, 104);
+      return item;
+    }
     function formatDate(date) { return new Intl.DateTimeFormat("pt-BR", { day:"2-digit", month:"2-digit", year:"numeric" }).format(date); }
     function monthName(date) { return new Intl.DateTimeFormat("pt-BR", { month:"long" }).format(date); }
     function nationalHolidaysBetween(start, end) {
@@ -413,8 +433,13 @@
       }
       return found.sort((a,b) => a.date - b.date);
     }
-    function holidaysInWeek(start) {
-      return nationalHolidaysBetween(start, addDays(start, 6)).filter(holiday => holiday.isBusinessDay);
+    function weekBusinessInfo(start, rangeStart, rangeEnd) {
+      const first = start > rangeStart ? start : rangeStart; const weekEnd = addDays(start, 6); const last = weekEnd < rangeEnd ? weekEnd : rangeEnd;
+      if (first > last) return { holidays: [], businessDays: 0 };
+      let weekdays = 0;
+      for (let date = new Date(first); date <= last; date.setDate(date.getDate() + 1)) if (date.getDay() >= 1 && date.getDay() <= 5) weekdays++;
+      const holidays = nationalHolidaysBetween(first, last).filter(holiday => holiday.isBusinessDay);
+      return { holidays, businessDays: weekdays - holidays.length };
     }
     function monthsBetween(start, end) {
       const months = []; const cursor = new Date(start.getFullYear(), start.getMonth(), 1, 12);
@@ -432,7 +457,7 @@
       return { weekdays, holidays, total: weekdays - holidays.length };
     }
     function renderBusinessDaysDialog() {
-      const p = project(); const first = monday(p.startDate); const last = addDays(first, (p.weeks * 7) - 1);
+      const p = project(); const first = dateFromInput(p.startDate); const last = dateFromInput(p.endDate);
       $("businessDaysBody").innerHTML = monthsBetween(first, last).map(month => {
         const result = businessDaysForMonth(month);
         const holidayNames = result.holidays.map(holiday => `${formatDate(holiday.date).slice(0,5)} ${holiday.name}`).join(" · ");
@@ -440,7 +465,7 @@
       }).join("");
     }
     function renderHolidayValidation() {
-      const p = project(); const first = monday(p.startDate); const last = addDays(first, (p.weeks * 7) - 1);
+      const p = project(); const first = dateFromInput(p.startDate); const last = dateFromInput(p.endDate);
       const holidays = nationalHolidaysBetween(first, last); const businessHolidays = holidays.filter(holiday => holiday.isBusinessDay);
       $("holidayCheckCount").textContent = holidays.length ? `${holidays.length} encontrado${holidays.length === 1 ? "" : "s"}` : "Período validado";
       $("holidayMetric").textContent = businessHolidays.length;
@@ -456,10 +481,11 @@
       if (showMessage) notify("Projeto salvo neste navegador."); renderProjectList();
     }
     function setInputs() {
-      const p = project(); $("projectName").value = p.name; $("startDate").value = p.startDate; $("weekCount").value = p.weeks; $("version").value = p.version || ""; $("riskText").value = p.risk || "";
+      const p = syncProjectRange(project()); $("projectName").value = p.name; $("startDate").value = p.startDate; $("endDate").value = p.endDate; $("version").value = p.version || ""; $("riskText").value = p.risk || "";
+      $("rangeSummary").textContent = `${durationWeeksForRange(p.startDate,p.endDate)} semanas entre as datas`;
     }
     function renderProjectList() {
-      $("projectList").innerHTML = projects.map(p => `<button class="project-item ${p.id===currentId?"active":""}" data-project="${p.id}"><strong>${escapeHtml(p.name)}</strong><span>${p.weeks} semanas · ${escapeHtml(p.version || "Sem versão")}</span></button>`).join("");
+      $("projectList").innerHTML = projects.map(p => `<button class="project-item ${p.id===currentId?"active":""}" data-project="${p.id}"><strong>${escapeHtml(p.name)}</strong><span>${durationWeeksForRange(p.startDate,p.endDate)} semanas · ${escapeHtml(p.version || "Sem versão")}</span></button>`).join("");
       document.querySelectorAll("[data-project]").forEach(btn => btn.onclick = () => { currentId = btn.dataset.project; setInputs(); render(); save(); });
     }
     function monthSegments(weeks) {
@@ -469,12 +495,12 @@
     }
     function renderTimeline() {
       const p = project(); document.documentElement.style.setProperty("--weeks", p.weeks);
-      const first = monday(p.startDate); const weeks = Array.from({length:p.weeks}, (_,i) => addDays(first, i*7));
-      const holidayMap = weeks.map(holidaysInWeek); const timeline = $("timeline");
+      const rangeStart = dateFromInput(p.startDate); const rangeEnd = dateFromInput(p.endDate); const first = monday(p.startDate); const weeks = Array.from({length:p.weeks}, (_,i) => addDays(first, i*7));
+      const weekInfoMap = weeks.map(week => weekBusinessInfo(week, rangeStart, rangeEnd)); const holidayMap = weekInfoMap.map(info => info.holidays); const timeline = $("timeline");
       const months = monthSegments(weeks).map(s => `<div class="month" style="grid-column:${s.start+2} / span ${s.count}">${escapeHtml(s.name)} ${weeks[s.start].getFullYear()}</div>`).join("");
       let html = `<div class="timeline-row month-row"><div class="sticky-label"></div>${months}</div>`;
       html += `<div class="timeline-row week-row"><div class="sticky-label">Atividade / Semana ISO</div>${weeks.map(w => `<div class="week-head">S${isoWeek(w)}<br>${String(w.getDate()).padStart(2,"0")}/${String(w.getMonth()+1).padStart(2,"0")}</div>`).join("")}</div>`;
-      html += `<div class="timeline-row days-row"><div class="sticky-label">Dias úteis (* feriado nacional)</div>${weeks.map((w,i) => { const holidays=holidayMap[i]; const title=holidays.map(h=>`${h.name} (${formatDate(h.date)})`).join(" · "); return `<div class="day-cell ${holidays.length?"holiday":""}" ${title?`title="${escapeHtml(title)}"`:""}>${5-holidays.length}${holidays.length?"*":""}</div>`; }).join("")}</div>`;
+      html += `<div class="timeline-row days-row"><div class="sticky-label">Dias úteis (* feriado nacional)</div>${weeks.map((w,i) => { const info=weekInfoMap[i],holidays=info.holidays; const title=holidays.map(h=>`${h.name} (${formatDate(h.date)})`).join(" · "); return `<div class="day-cell ${holidays.length?"holiday":""}" ${title?`title="${escapeHtml(title)}"`:""}>${info.businessDays}${holidays.length?"*":""}</div>`; }).join("")}</div>`;
       p.modules.forEach((module, moduleIndex) => {
         html += `<div class="timeline-row"><div class="module-head" style="--module-color:${module.color}"><button data-collapse="${module.id}" aria-label="${module.collapsed?"Expandir":"Recolher"} módulo">${module.collapsed?"＋":"−"}</button><strong>${escapeHtml(module.code)} · ${escapeHtml(module.name)}</strong><span>${module.activities.length} atividades</span><div class="module-actions"><button data-add="${module.id}" title="Adicionar atividade" aria-label="Adicionar atividade">＋</button><button data-edit-module="${module.id}" title="Editar módulo" aria-label="Editar módulo">✎</button><button data-duplicate-module="${module.id}" title="Duplicar módulo" aria-label="Duplicar módulo">⧉</button><button data-remove-module="${module.id}" title="Excluir módulo" aria-label="Excluir módulo">×</button></div></div></div>`;
         if (!module.collapsed) {
@@ -541,18 +567,20 @@
       setTimeout(() => $("newActivityName").focus(), 0);
     }
     function render() {
-      const p=project(); const first=monday(p.startDate); const last=addDays(first,(p.weeks*7)-1);
+      const p=syncProjectRange(project()); const first=dateFromInput(p.startDate); const last=dateFromInput(p.endDate); const durationWeeks=durationWeeksForRange(p.startDate,p.endDate);
       $("barProjectName").textContent=p.name; $("barPeriod").textContent=`${formatDate(first)} a ${formatDate(last)} · ${p.version||""}`;
-      $("mainProjectName").textContent=p.name; $("mainProjectMeta").textContent=`Estratégia de implantação · início ${formatDate(first)} · ${p.weeks} semanas`;
+      $("mainProjectName").textContent=p.name; $("mainProjectMeta").textContent=`Estratégia de implantação · ${formatDate(first)} a ${formatDate(last)}`;
       $("riskBarText").textContent=p.risk || "Nenhum risco crítico informado."; $("riskBar").classList.toggle("empty-risk",!p.risk);
-      $("moduleMetric").textContent=p.modules.length; const activities=p.modules.flatMap(m=>m.activities); $("activityMetric").textContent=activities.length; $("goLiveMetric").textContent=activities.filter(a=>a.type==="golive").length;
+      $("moduleMetric").textContent=p.modules.length; const activities=p.modules.flatMap(m=>m.activities); $("activityMetric").textContent=activities.length; $("weekMetric").textContent=durationWeeks; $("goLiveMetric").textContent=activities.filter(a=>a.type==="golive").length; $("rangeSummary").textContent=`${durationWeeks} semanas entre as datas`;
       renderHolidayValidation(); renderTimeline(); renderProjectList();
     }
     function normalizeImportedProject(payload) {
       const source = payload?.format === "cronograma-projetos" ? payload.project : payload;
       if (!source || typeof source !== "object" || !Array.isArray(source.modules)) throw new Error("Formato incompatível");
       if (typeof source.startDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(source.startDate)) throw new Error("Data inicial inválida");
-      const weeks = clamp(Number(source.weeks) || 18, 4, 40);
+      const endDate = /^\d{4}-\d{2}-\d{2}$/.test(source.endDate || "") ? source.endDate : deriveEndDate(source.startDate, source.weeks);
+      if (dateFromInput(endDate) < dateFromInput(source.startDate)) throw new Error("Período inválido");
+      const weeks = clamp(timelineWeeksForRange(source.startDate, endDate), 1, 104);
       const modules = source.modules.map((module, moduleIndex) => {
         if (!module || typeof module !== "object" || !Array.isArray(module.activities)) throw new Error("Módulo inválido");
         return {
@@ -575,21 +603,28 @@
         id: crypto.randomUUID(),
         name: String(source.name || "Projeto importado"),
         startDate: source.startDate,
+        endDate,
         weeks,
         version: String(source.version || "V1"),
         risk: String(source.risk || ""),
         modules
       };
     }
-    ["projectName","startDate","weekCount","version","riskText"].forEach(id => $(id).addEventListener("change", () => {
+    ["projectName","startDate","endDate","version","riskText"].forEach(id => $(id).addEventListener("change", () => {
       const p=project();
       if (!$('startDate').value) { $('startDate').setCustomValidity('Selecione uma data inicial para validar os feriados.'); $('startDate').reportValidity(); $('startDate').value=p.startDate; return; }
-      $('startDate').setCustomValidity(''); p.name=$("projectName").value.trim()||"Projeto sem nome"; p.startDate=$("startDate").value; p.weeks=clamp(Number($("weekCount").value)||18,4,40); p.version=$("version").value.trim(); p.risk=$("riskText").value.trim();
+      if (!$('endDate').value) { $('endDate').setCustomValidity('Selecione uma data final.'); $('endDate').reportValidity(); $('endDate').value=p.endDate; return; }
+      if (dateFromInput($("endDate").value) < dateFromInput($("startDate").value)) { $('endDate').setCustomValidity('A data final deve ser igual ou posterior à data inicial.'); $('endDate').reportValidity(); setInputs(); return; }
+      const weeks=timelineWeeksForRange($("startDate").value,$("endDate").value);
+      if (weeks>104) { $('endDate').setCustomValidity('Selecione um período de até 104 semanas.'); $('endDate').reportValidity(); setInputs(); return; }
+      $('startDate').setCustomValidity(''); $('endDate').setCustomValidity(''); p.name=$("projectName").value.trim()||"Projeto sem nome"; p.startDate=$("startDate").value; p.endDate=$("endDate").value; p.weeks=weeks; p.version=$("version").value.trim(); p.risk=$("riskText").value.trim();
       p.modules.forEach(m=>m.activities.forEach(a=>{a.start=clamp(a.start,0,p.weeks-1);a.end=clamp(a.end,-1,p.weeks-1);})); markDirty(); render();
     }));
     $("saveProject").onclick=()=>save(true);
     $("lightTheme").onclick=()=>setTheme("light");
     $("darkTheme").onclick=()=>setTheme("dark");
+    function setSidebarCollapsed(collapsed) { $("workspace").classList.toggle("sidebar-collapsed",collapsed); $("sidebarToggle").setAttribute("aria-expanded",String(!collapsed)); $("sidebarToggle").setAttribute("aria-label",collapsed?"Exibir painel lateral":"Recolher painel lateral"); $("sidebarToggle").title=collapsed?"Exibir painel lateral":"Recolher painel lateral"; localStorage.setItem("cronograma-sidebar-collapsed",String(collapsed)); }
+    $("sidebarToggle").onclick=()=>setSidebarCollapsed(!$("workspace").classList.contains("sidebar-collapsed"));
     $("newProject").onclick=()=>{ const p=defaultProject(); p.name="Novo projeto de rollout"; p.version="V1"; p.risk=""; projects.push(p); currentId=p.id; setInputs(); save(); render(); notify("Novo projeto criado."); };
     $("duplicateProject").onclick=()=>{ const copy=structuredClone(project()); copy.id=crypto.randomUUID(); copy.name += " — cópia"; copy.modules.forEach(m=>{m.id=crypto.randomUUID();m.activities.forEach(a=>a.id=crypto.randomUUID());}); projects.push(copy); currentId=copy.id; setInputs(); save(); render(); notify("Projeto duplicado."); };
     $("deleteProject").onclick=()=>{ if(projects.length===1){notify("Mantenha pelo menos um projeto.");return;} if(!confirm("Excluir este projeto?"))return; projects=projects.filter(p=>p.id!==currentId); currentId=projects[0].id; setInputs(); save(); render(); };
@@ -605,7 +640,7 @@
     $("newActivityType").innerHTML=Object.entries(TYPES).map(([value,type])=>`<option value="${value}">${escapeHtml(type.label)}</option>`).join("");
     $("newActivityType").onchange=()=>{ $("newActivityColor").value=TYPES[$("newActivityType").value].color; };
     $("confirmActivity").onclick=event=>{ event.preventDefault(); const name=$("newActivityName").value.trim(); const moduleId=$("activityModuleId").value; const module=project().modules.find(item=>item.id===moduleId); if(!name||!module)return; module.activities.push({id:crypto.randomUUID(),name,type:$("newActivityType").value,color:$("newActivityColor").value,start:0,end:0}); $("activityDialog").close(); markDirty(); render(); notify("Atividade adicionada com cor personalizada."); };
-    setTheme(document.documentElement.dataset.theme); setInputs(); render(); save();
+    setTheme(document.documentElement.dataset.theme); setSidebarCollapsed(localStorage.getItem("cronograma-sidebar-collapsed")==="true"); setInputs(); render(); save();
   </script>
 </body>
 </html>
