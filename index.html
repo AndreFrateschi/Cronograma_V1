@@ -291,8 +291,9 @@
 
   <dialog id="moduleDialog">
     <form method="dialog" id="moduleForm">
-      <div class="dialog-head"><h2>Novo módulo</h2><button class="close-dialog" value="cancel" aria-label="Fechar">×</button></div>
+      <div class="dialog-head"><h2 id="moduleDialogTitle">Novo módulo</h2><button class="close-dialog" value="cancel" aria-label="Fechar">×</button></div>
       <div class="dialog-body">
+        <input id="moduleEditId" type="hidden" />
         <div class="field"><label for="moduleName">Nome do módulo</label><input id="moduleName" required placeholder="Ex.: Integrações" /></div>
         <div class="field-row">
           <div class="field"><label for="moduleCode">Código</label><input id="moduleCode" required placeholder="M3" /></div>
@@ -475,7 +476,7 @@
       html += `<div class="timeline-row week-row"><div class="sticky-label">Atividade / Semana ISO</div>${weeks.map(w => `<div class="week-head">S${isoWeek(w)}<br>${String(w.getDate()).padStart(2,"0")}/${String(w.getMonth()+1).padStart(2,"0")}</div>`).join("")}</div>`;
       html += `<div class="timeline-row days-row"><div class="sticky-label">Dias úteis (* feriado nacional)</div>${weeks.map((w,i) => { const holidays=holidayMap[i]; const title=holidays.map(h=>`${h.name} (${formatDate(h.date)})`).join(" · "); return `<div class="day-cell ${holidays.length?"holiday":""}" ${title?`title="${escapeHtml(title)}"`:""}>${5-holidays.length}${holidays.length?"*":""}</div>`; }).join("")}</div>`;
       p.modules.forEach((module, moduleIndex) => {
-        html += `<div class="timeline-row"><div class="module-head" style="--module-color:${module.color}"><button data-collapse="${module.id}" aria-label="${module.collapsed?"Expandir":"Recolher"} módulo">${module.collapsed?"＋":"−"}</button><strong>${escapeHtml(module.code)} · ${escapeHtml(module.name)}</strong><span>${module.activities.length} atividades</span><div class="module-actions"><button data-add="${module.id}" aria-label="Adicionar atividade">＋</button><button data-remove-module="${module.id}" aria-label="Excluir módulo">×</button></div></div></div>`;
+        html += `<div class="timeline-row"><div class="module-head" style="--module-color:${module.color}"><button data-collapse="${module.id}" aria-label="${module.collapsed?"Expandir":"Recolher"} módulo">${module.collapsed?"＋":"−"}</button><strong>${escapeHtml(module.code)} · ${escapeHtml(module.name)}</strong><span>${module.activities.length} atividades</span><div class="module-actions"><button data-add="${module.id}" title="Adicionar atividade" aria-label="Adicionar atividade">＋</button><button data-edit-module="${module.id}" title="Editar módulo" aria-label="Editar módulo">✎</button><button data-duplicate-module="${module.id}" title="Duplicar módulo" aria-label="Duplicar módulo">⧉</button><button data-remove-module="${module.id}" title="Excluir módulo" aria-label="Excluir módulo">×</button></div></div></div>`;
         if (!module.collapsed) {
           module.activities.forEach(activity => {
             const color = activity.color || TYPES[activity.type]?.color || module.color;
@@ -496,11 +497,33 @@
     function wireTimelineEvents() {
       document.querySelectorAll("[data-collapse]").forEach(btn => btn.onclick = () => { const m=project().modules.find(x=>x.id===btn.dataset.collapse); m.collapsed=!m.collapsed; markDirty(); renderTimeline(); });
       document.querySelectorAll("[data-add]").forEach(btn => btn.onclick = () => addActivity(btn.dataset.add));
+      document.querySelectorAll("[data-edit-module]").forEach(btn => btn.onclick = () => openModuleDialog(btn.dataset.editModule));
+      document.querySelectorAll("[data-duplicate-module]").forEach(btn => btn.onclick = () => duplicateModule(btn.dataset.duplicateModule));
       document.querySelectorAll("[data-remove-module]").forEach(btn => btn.onclick = () => { if (!confirm("Excluir este módulo e todas as atividades?")) return; project().modules=project().modules.filter(m=>m.id!==btn.dataset.removeModule); markDirty(); render(); });
       document.querySelectorAll("[data-remove]").forEach(btn => btn.onclick = () => { const [mid,aid]=btn.dataset.remove.split("|"); const m=project().modules.find(x=>x.id===mid); m.activities=m.activities.filter(a=>a.id!==aid); markDirty(); render(); });
       document.querySelectorAll("[data-name]").forEach(input => input.onchange = () => { const [mid,aid]=input.dataset.name.split("|"); project().modules.find(x=>x.id===mid).activities.find(a=>a.id===aid).name=input.value; markDirty(); render(); });
       document.querySelectorAll("[data-slot]").forEach(btn => btn.onclick = () => toggleSlot(btn.dataset.slot));
-      $("addModule").onclick = () => $("moduleDialog").showModal();
+      $("addModule").onclick = () => openModuleDialog();
+    }
+    function openModuleDialog(moduleId = "") {
+      const module = moduleId ? project().modules.find(item => item.id === moduleId) : null;
+      $("moduleForm").reset();
+      $("moduleEditId").value = module?.id || "";
+      $("moduleDialogTitle").textContent = module ? "Editar módulo" : "Novo módulo";
+      $("confirmModule").textContent = module ? "Salvar alterações" : "Adicionar";
+      $("moduleName").value = module?.name || "";
+      $("moduleCode").value = module?.code || "";
+      $("moduleColor").value = module?.color || "#1769aa";
+      $("moduleDialog").showModal();
+      setTimeout(() => $("moduleName").focus(), 0);
+    }
+    function duplicateModule(moduleId) {
+      const modules = project().modules; const sourceIndex = modules.findIndex(item => item.id === moduleId);
+      if (sourceIndex < 0) return;
+      const copy = structuredClone(modules[sourceIndex]);
+      copy.id = crypto.randomUUID(); copy.code = `${copy.code}-COPIA`; copy.name += " — cópia"; copy.collapsed = false;
+      copy.activities.forEach(activity => activity.id = crypto.randomUUID());
+      modules.splice(sourceIndex + 1, 0, copy); markDirty(); render(); notify("Módulo duplicado com todas as atividades.");
     }
     function toggleSlot(value) {
       const [mid,aid,indexText]=value.split("|"); const index=Number(indexText); const a=project().modules.find(x=>x.id===mid).activities.find(x=>x.id===aid);
@@ -578,7 +601,7 @@
     $("importProject").onclick=openImport;
     $("importProjectTop").onclick=openImport;
     $("importFile").onchange=async event=>{ try{const payload=JSON.parse(await event.target.files[0].text()); const imported=normalizeImportedProject(payload); projects.push(imported); currentId=imported.id; setInputs(); save(); render(); notify("Arquivo importado com sucesso.");}catch{notify("Arquivo incompatível ou inválido.");} event.target.value=""; };
-    $("confirmModule").onclick=event=>{ event.preventDefault(); const name=$("moduleName").value.trim(),code=$("moduleCode").value.trim(); if(!name||!code)return; project().modules.push({id:crypto.randomUUID(),code,name,color:$("moduleColor").value,collapsed:false,activities:[]}); $("moduleDialog").close(); $("moduleForm").reset(); markDirty(); render(); };
+    $("confirmModule").onclick=event=>{ event.preventDefault(); const name=$("moduleName").value.trim(),code=$("moduleCode").value.trim(),editId=$("moduleEditId").value; if(!name||!code)return; const existing=editId?project().modules.find(module=>module.id===editId):null; if(existing){existing.name=name;existing.code=code;existing.color=$("moduleColor").value;}else{project().modules.push({id:crypto.randomUUID(),code,name,color:$("moduleColor").value,collapsed:false,activities:[]});} $("moduleDialog").close(); $("moduleForm").reset(); markDirty(); render(); notify(existing?"Módulo atualizado.":"Módulo adicionado."); };
     $("newActivityType").innerHTML=Object.entries(TYPES).map(([value,type])=>`<option value="${value}">${escapeHtml(type.label)}</option>`).join("");
     $("newActivityType").onchange=()=>{ $("newActivityColor").value=TYPES[$("newActivityType").value].color; };
     $("confirmActivity").onclick=event=>{ event.preventDefault(); const name=$("newActivityName").value.trim(); const moduleId=$("activityModuleId").value; const module=project().modules.find(item=>item.id===moduleId); if(!name||!module)return; module.activities.push({id:crypto.randomUUID(),name,type:$("newActivityType").value,color:$("newActivityColor").value,start:0,end:0}); $("activityDialog").close(); markDirty(); render(); notify("Atividade adicionada com cor personalizada."); };
