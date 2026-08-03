@@ -118,14 +118,14 @@
     .slot { position: relative; display: grid; place-items: center; border: 0; border-right: 1px solid #d9e2e7; background: transparent; }
     .timeline-row.activity:nth-child(even) .slot, .timeline-row.activity:nth-child(even) .sticky-label { background-color: #f2f7f9; }
     .slot.active::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #fff; }
-    .slot.active { background: var(--activity-color) !important; }
+    .slot.active { background: var(--activity-fill, var(--activity-color)) !important; }
     .slot:hover { box-shadow: inset 0 0 0 2px #2a8fb9; }
     .slot.holiday-column:not(.active) { background: #fff8eb !important; }
     .add-activity-row { display: grid; grid-template-columns: var(--label) 1fr; min-height: 38px; border-bottom: 1px solid #d9e2e7; }
     .add-activity-row .sticky-label { padding: 5px 8px; border-right: 1px solid #d9e2e7; }
     .legend { display: flex; flex-wrap: wrap; gap: 7px 16px; padding: 11px 12px; border-top: 3px solid #243c4c; background: #fff; }
     .legend-item { display: flex; align-items: center; gap: 6px; color: #536670; font-size: 11px; }
-    .swatch { width: 13px; height: 13px; background: var(--swatch); }
+    .swatch { width: 13px; height: 13px; background: var(--swatch-fill, var(--swatch)); border: 1px solid rgba(16,37,50,.14); }
     .legend-separator { width: 1px; align-self: stretch; min-height: 20px; background: #d5dfe4; }
     .business-days-table { width: 100%; border-collapse: collapse; }
     .business-days-table th, .business-days-table td { border-bottom: 1px solid #d7e0e5; padding: 10px 8px; text-align: left; }
@@ -334,10 +334,7 @@
       <div class="dialog-body">
         <input id="activityModuleId" type="hidden" />
         <div class="field"><label for="newActivityName">Nome da atividade</label><input id="newActivityName" required placeholder="Ex.: Preparação do ambiente" /></div>
-        <div class="field-row">
-          <div class="field"><label for="newActivityType">Tipo</label><select id="newActivityType"></select></div>
-          <div class="field"><label for="newActivityColor">Cor da atividade</label><input id="newActivityColor" type="color" value="#5669c4" /></div>
-        </div>
+        <div class="field"><label for="newActivityOwner">Responsável</label><select id="newActivityOwner"></select></div>
       </div>
       <div class="dialog-actions"><button class="btn" value="cancel">Cancelar</button><button class="btn btn-primary" id="confirmActivity" value="default">Adicionar</button></div>
     </form>
@@ -371,6 +368,11 @@
       golive: { label: "Go Live", color: "#156b2a" },
       hypercare: { label: "Hypercare", color: "#4d8c2c" },
       risk: { label: "Risco", color: "#c91f26" }
+    };
+    const OWNERS = {
+      tsystems: { label: "Itens da T-Systems", color: "#e20074", fill: "#e20074" },
+      yamaha: { label: "Itens da Yamaha / Programa Ikari", color: "#1769aa", fill: "#1769aa" },
+      shared: { label: "Dependências T-Systems + Yamaha", color: "#1769aa", fill: "linear-gradient(135deg, #e20074 0 50%, #1769aa 50% 100%)" }
     };
     const NATIONAL_HOLIDAYS = [
       [0,1,"Confraternização Universal"],[3,21,"Tiradentes"],[4,1,"Dia Mundial do Trabalho"],
@@ -436,7 +438,14 @@
     function syncProjectRange(item) {
       item.endDate = /^\d{4}-\d{2}-\d{2}$/.test(item.endDate || "") ? item.endDate : deriveEndDate(item.startDate, item.weeks);
       item.weeks = clamp(timelineWeeksForRange(item.startDate, item.endDate), 1, 104);
+      item.modules?.forEach(module => module.activities?.forEach(activity => activity.owner = OWNERS[activity.owner] ? activity.owner : inferOwner(activity)));
       return item;
+    }
+    function inferOwner(activity) {
+      const text = `${activity?.name || ""} ${activity?.type || ""}`.toLocaleLowerCase("pt-BR");
+      if (/\bts\b|t-systems|t systems|desenvolvimento/.test(text)) return "tsystems";
+      if (/aprova|homologa|valida|go\s*\/?\s*no\s*go|go live|gmud|decision|golive|change/.test(text)) return "shared";
+      return "yamaha";
     }
     function formatDate(date) { return new Intl.DateTimeFormat("pt-BR", { day:"2-digit", month:"2-digit", year:"numeric" }).format(date); }
     function monthName(date) { return new Intl.DateTimeFormat("pt-BR", { month:"long" }).format(date); }
@@ -539,18 +548,13 @@
         html += `<div class="timeline-row"><div class="module-head" style="--module-color:${module.color}"><button data-collapse="${module.id}" aria-label="${module.collapsed?"Expandir":"Recolher"} módulo">${module.collapsed?"＋":"−"}</button><strong>${escapeHtml(module.code)} · ${escapeHtml(module.name)}</strong><span>${module.activities.length} atividades</span><div class="module-actions"><button data-add="${module.id}" title="Adicionar atividade" aria-label="Adicionar atividade">＋</button><button data-edit-module="${module.id}" title="Editar módulo" aria-label="Editar módulo">✎</button><button data-duplicate-module="${module.id}" title="Duplicar módulo" aria-label="Duplicar módulo">⧉</button><button data-remove-module="${module.id}" title="Excluir módulo" aria-label="Excluir módulo">×</button></div></div></div>`;
         if (!module.collapsed) {
           module.activities.forEach(activity => {
-            const color = activity.color || TYPES[activity.type]?.color || module.color;
-            html += `<div class="timeline-row activity" style="--module-color:${module.color};--activity-color:${color}"><div class="sticky-label activity-label"><span class="activity-code">${escapeHtml(module.code)}</span><input class="activity-name" data-name="${module.id}|${activity.id}" value="${escapeHtml(activity.name)}" aria-label="Nome da atividade"><button class="remove-activity" data-remove="${module.id}|${activity.id}" aria-label="Excluir atividade">×</button></div>${periods.map(period=>{const active=activity.start<=period.endWeek&&activity.end>=period.startWeek;return `<button class="slot ${active?"active":""} ${period.holidays.length?"holiday-column":""}" data-slot="${module.id}|${activity.id}|${period.startWeek}|${period.endWeek}" aria-label="${escapeHtml(period.ariaLabel)}: ${active?"ativa":"inativa"}"></button>`;}).join("")}</div>`;
+            const ownerKey = OWNERS[activity.owner] ? activity.owner : inferOwner(activity); const owner = OWNERS[ownerKey];
+            html += `<div class="timeline-row activity" style="--module-color:${module.color};--activity-color:${owner.color};--activity-fill:${owner.fill}"><div class="sticky-label activity-label"><span class="activity-code">${escapeHtml(module.code)}</span><input class="activity-name" data-name="${module.id}|${activity.id}" value="${escapeHtml(activity.name)}" aria-label="Nome da atividade"><button class="remove-activity" data-remove="${module.id}|${activity.id}" aria-label="Excluir atividade">×</button></div>${periods.map(period=>{const active=activity.start<=period.endWeek&&activity.end>=period.startWeek;return `<button class="slot ${active?"active":""} ${period.holidays.length?"holiday-column":""}" data-slot="${module.id}|${activity.id}|${period.startWeek}|${period.endWeek}" aria-label="${escapeHtml(period.ariaLabel)}: ${active?"ativa":"inativa"}; ${escapeHtml(owner.label)}"></button>`;}).join("")}</div>`;
           });
           html += `<div class="add-activity-row"><div class="sticky-label"><button class="btn" data-add="${module.id}">＋ Adicionar atividade</button></div><div></div></div>`;
         }
       });
-      const customLegend = []; const customKeys = new Set();
-      p.modules.flatMap(module => module.activities).filter(activity => activity.color).forEach(activity => {
-        const key = `${activity.name}|${activity.color}`;
-        if (!customKeys.has(key)) { customKeys.add(key); customLegend.push(activity); }
-      });
-      html += `<div class="legend">${Object.values(TYPES).map(t => `<span class="legend-item"><i class="swatch" style="--swatch:${t.color}"></i>${escapeHtml(t.label)}</span>`).join("")}${customLegend.length ? `<span class="legend-separator" aria-hidden="true"></span>${customLegend.map(activity => `<span class="legend-item"><i class="swatch" style="--swatch:${activity.color}"></i>${escapeHtml(activity.name)}</span>`).join("")}` : ""}<button class="btn" id="addModule">＋ Adicionar módulo</button></div>`;
+      html += `<div class="legend">${Object.values(OWNERS).map(owner => `<span class="legend-item"><i class="swatch" style="--swatch:${owner.color};--swatch-fill:${owner.fill}"></i>${escapeHtml(owner.label)}</span>`).join("")}<button class="btn" id="addModule">＋ Adicionar módulo</button></div>`;
       timeline.innerHTML = html;
       wireTimelineEvents();
     }
@@ -598,8 +602,7 @@
     function addActivity(moduleId) {
       $("activityModuleId").value = moduleId;
       $("newActivityName").value = "";
-      $("newActivityType").value = "detail";
-      $("newActivityColor").value = TYPES.detail.color;
+      $("newActivityOwner").value = "yamaha";
       $("activityDialog").showModal();
       setTimeout(() => $("newActivityName").focus(), 0);
     }
@@ -630,6 +633,7 @@
             id: crypto.randomUUID(),
             name: String(activity?.name || "Atividade sem nome"),
             type: TYPES[activity?.type] ? activity.type : "detail",
+            owner: OWNERS[activity?.owner] ? activity.owner : inferOwner(activity),
             color: /^#[0-9a-f]{6}$/i.test(activity?.color || "") ? activity.color : undefined,
             start: clamp(Number(activity?.start) || 0, 0, weeks - 1),
             end: clamp(Number.isFinite(Number(activity?.end)) ? Number(activity.end) : 0, -1, weeks - 1)
@@ -678,9 +682,8 @@
     $("importProjectTop").onclick=openImport;
     $("importFile").onchange=async event=>{ try{const payload=JSON.parse(await event.target.files[0].text()); const imported=normalizeImportedProject(payload); projects.push(imported); currentId=imported.id; setInputs(); save(); render(); notify("Arquivo importado com sucesso.");}catch{notify("Arquivo incompatível ou inválido.");} event.target.value=""; };
     $("confirmModule").onclick=event=>{ event.preventDefault(); const name=$("moduleName").value.trim(),code=$("moduleCode").value.trim(),editId=$("moduleEditId").value; if(!name||!code)return; const existing=editId?project().modules.find(module=>module.id===editId):null; if(existing){existing.name=name;existing.code=code;existing.color=$("moduleColor").value;}else{project().modules.push({id:crypto.randomUUID(),code,name,color:$("moduleColor").value,collapsed:false,activities:[]});} $("moduleDialog").close(); $("moduleForm").reset(); markDirty(); render(); notify(existing?"Módulo atualizado.":"Módulo adicionado."); };
-    $("newActivityType").innerHTML=Object.entries(TYPES).map(([value,type])=>`<option value="${value}">${escapeHtml(type.label)}</option>`).join("");
-    $("newActivityType").onchange=()=>{ $("newActivityColor").value=TYPES[$("newActivityType").value].color; };
-    $("confirmActivity").onclick=event=>{ event.preventDefault(); const name=$("newActivityName").value.trim(); const moduleId=$("activityModuleId").value; const module=project().modules.find(item=>item.id===moduleId); if(!name||!module)return; module.activities.push({id:crypto.randomUUID(),name,type:$("newActivityType").value,color:$("newActivityColor").value,start:0,end:0}); $("activityDialog").close(); markDirty(); render(); notify("Atividade adicionada com cor personalizada."); };
+    $("newActivityOwner").innerHTML=Object.entries(OWNERS).map(([value,owner])=>`<option value="${value}">${escapeHtml(owner.label)}</option>`).join("");
+    $("confirmActivity").onclick=event=>{ event.preventDefault(); const name=$("newActivityName").value.trim(); const moduleId=$("activityModuleId").value; const module=project().modules.find(item=>item.id===moduleId); if(!name||!module)return; module.activities.push({id:crypto.randomUUID(),name,type:"detail",owner:$("newActivityOwner").value,start:0,end:0}); $("activityDialog").close(); markDirty(); render(); notify("Atividade adicionada com o responsável selecionado."); };
     setTheme(document.documentElement.dataset.theme); setTimelineView(timelineView,false); setSidebarCollapsed(localStorage.getItem("cronograma-sidebar-collapsed")==="true"); setInputs(); render(); save();
   </script>
 </body>
