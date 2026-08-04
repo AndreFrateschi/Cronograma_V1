@@ -757,7 +757,23 @@
     $("confirmModule").onclick=event=>{ event.preventDefault(); const name=$("moduleName").value.trim(),code=$("moduleCode").value.trim(),editId=$("moduleEditId").value; if(!name||!code)return; const existing=editId?project().modules.find(module=>module.id===editId):null; if(existing){existing.name=name;existing.code=code;existing.color=$("moduleColor").value;}else{project().modules.push({id:crypto.randomUUID(),code,name,color:$("moduleColor").value,collapsed:false,activities:[]});} $("moduleDialog").close(); $("moduleForm").reset(); markDirty(); render(); notify(existing?"Módulo atualizado.":"Módulo adicionado."); };
     $("addOwnerOption").onclick=()=>openOwnerEditor();
     $("editOwnerOption").onclick=()=>openOwnerEditor($("newActivityOwner").value);
-    $("confirmNewOwner").onclick=()=>{ const label=$("newOwnerName").value.trim(),color=$("newOwnerColor").value,editId=$("ownerEditId").value; if(!label){$("newOwnerName").focus();notify("Informe o nome do responsável.");return;} const owners=ownerCatalog(project()); const duplicate=Object.entries(owners).find(([id,owner])=>id!==editId&&owner.label.toLocaleLowerCase("pt-BR")===label.toLocaleLowerCase("pt-BR")); if(duplicate){populateOwnerOptions(duplicate[0]);$("customOwnerFields").hidden=true;notify("Esse responsável já existe e foi selecionado.");return;} let selectedId=editId;if(editId){if(OWNERS[editId]){project().ownerOverrides={...normalizeOwnerOverrides(project().ownerOverrides),[editId]:{label,color}};}else{const custom=(project().owners||[]).find(owner=>owner.id===editId);if(custom){custom.label=label;custom.color=color;}}}else{const owner={id:`custom-${crypto.randomUUID()}`,label,color};project().owners=normalizeOwnerList([...(project().owners||[]),owner]);selectedId=owner.id;} populateOwnerOptions(selectedId);$("customOwnerFields").hidden=true;$("newOwnerName").value="";$("ownerEditId").value="";markDirty();renderTimeline();notify(editId?"Responsável atualizado em todas as atividades.":"Novo responsável adicionado ao índice."); };
+    $("confirmNewOwner").onclick=()=>{
+      const label=$("newOwnerName").value.trim(),color=$("newOwnerColor").value,editId=$("ownerEditId").value;
+      if(!label){$("newOwnerName").focus();notify("Informe o nome do responsável.");return;}
+      const owners=ownerCatalog(project()); const duplicate=Object.entries(owners).find(([id,owner])=>id!==editId&&owner.label.toLocaleLowerCase("pt-BR")===label.toLocaleLowerCase("pt-BR"));
+      if(duplicate){populateOwnerOptions(duplicate[0]);$("customOwnerFields").hidden=true;notify("Esse responsável já existe e foi selecionado.");return;}
+      let selectedId=editId;
+      if(editId&&OWNERS[editId]){
+        const overrides=normalizeOwnerOverrides(project().ownerOverrides),standard=OWNERS[editId];
+        if(label===standard.label&&color.toLowerCase()===standard.color.toLowerCase())delete overrides[editId];else overrides[editId]={label,color};
+        project().ownerOverrides=overrides;
+      }else if(editId){
+        const custom=(project().owners||[]).find(owner=>owner.id===editId); if(custom){custom.label=label;custom.color=color;}
+      }else{
+        const owner={id:`custom-${crypto.randomUUID()}`,label,color}; project().owners=normalizeOwnerList([...(project().owners||[]),owner]); selectedId=owner.id;
+      }
+      populateOwnerOptions(selectedId); $("customOwnerFields").hidden=true; $("newOwnerName").value=""; $("ownerEditId").value=""; markDirty(); renderTimeline(); notify(editId?"Responsável atualizado em todas as atividades.":"Novo responsável adicionado ao índice.");
+    };
     $("confirmActivity").onclick=event=>{ event.preventDefault(); const name=$("newActivityName").value.trim(),moduleId=$("activityModuleId").value,editId=$("activityEditId").value,owner=$("newActivityOwner").value; const module=project().modules.find(item=>item.id===moduleId); if(!name||!module)return; const activity=editId?module.activities.find(item=>item.id===editId):null; if(activity){activity.name=name;activity.owner=owner;}else{module.activities.push({id:crypto.randomUUID(),name,type:"detail",owner,start:0,end:0});} $("activityDialog").close(); markDirty(); render(); notify(activity?"Atividade atualizada.":"Atividade adicionada com o responsável selecionado."); };
     document.querySelectorAll(".close-dialog").forEach(button=>button.onclick=event=>{ event.preventDefault(); const dialog=button.closest("dialog"); if(dialog?.open)dialog.close("cancel"); });
     setTheme(document.documentElement.dataset.theme); setTimelineView(timelineView,false); setActivityLabelWidth(activityLabelWidth,false); setSidebarCollapsed(localStorage.getItem("cronograma-sidebar-collapsed")==="true"); setInputs(); render(); save();
