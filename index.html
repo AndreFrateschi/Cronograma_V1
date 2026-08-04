@@ -87,11 +87,13 @@
     .riskbar strong { font-size: 12px; text-transform: uppercase; }
     .riskbar span { flex: 1; }
     .riskbar button { border: 0; padding: 3px 7px; background: transparent; color: #fff; font-size: 18px; }
-    .view-toolbar { display: flex; align-items: center; justify-content: flex-end; margin-bottom: 9px; }
+    .view-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 9px; }
     .view-switch { display: inline-flex; align-items: center; padding: 3px; border: 1px solid #bdc9d0; border-radius: 5px; background: #fff; }
     .view-option { min-height: 28px; border: 0; border-radius: 3px; padding: 4px 11px; background: transparent; color: #536670; font-size: 12px; font-weight: 700; }
     .view-option:hover { background: #edf3f6; }
     .view-option[aria-pressed="true"] { background: #1769aa; color: #fff; }
+    .width-option { width: 34px; padding: 0; font-size: 18px; line-height: 1; }
+    .width-option:disabled { cursor: default; opacity: .3; }
     .timeline-shell { border: 1px solid #bfcbd2; background: #fff; overflow: auto; max-height: calc(100vh - 220px); }
     .timeline { min-width: calc(var(--label) + var(--weeks) * var(--week)); }
     .timeline-row { display: grid; grid-template-columns: var(--label) repeat(var(--weeks), var(--week)); min-height: 36px; border-bottom: 1px solid #d9e2e7; }
@@ -320,6 +322,10 @@
       </section>
       <section class="riskbar" id="riskBar"><strong>Risco</strong><span id="riskBarText"></span><button id="editRisk" aria-label="Editar risco">✎</button></section>
       <section class="view-toolbar" aria-label="Visualização do cronograma">
+        <div class="view-switch" role="group" aria-label="Largura da coluna de atividades">
+          <button class="view-option width-option" id="decreaseActivityWidth" type="button" title="Diminuir coluna de atividades" aria-label="Diminuir coluna de atividades">−</button>
+          <button class="view-option width-option" id="increaseActivityWidth" type="button" title="Aumentar coluna de atividades" aria-label="Aumentar coluna de atividades">＋</button>
+        </div>
         <div class="view-switch" role="group" aria-label="Escala de tempo">
           <button class="view-option" id="viewWeek" type="button" aria-pressed="true">Semanal</button>
           <button class="view-option" id="viewMonth" type="button" aria-pressed="false">Mensal</button>
@@ -433,6 +439,7 @@
     const escapeHtml = value => String(value).replace(/[&<>'"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c]));
     let dirtyTimer;
     let timelineView = ["week","month","quarter"].includes(localStorage.getItem("cronograma-timeline-view")) ? localStorage.getItem("cronograma-timeline-view") : "week";
+    let activityLabelWidth = clamp(Number(localStorage.getItem("cronograma-activity-width")) || 300, 220, 620);
 
     function setTheme(theme) {
       const selected = theme === "dark" ? "dark" : "light";
@@ -441,6 +448,11 @@
       $("lightTheme").setAttribute("aria-pressed", String(selected === "light"));
       $("darkTheme").setAttribute("aria-pressed", String(selected === "dark"));
       document.querySelector('meta[name="theme-color"]').content = selected === "dark" ? "#0a151c" : "#102532";
+    }
+    function setActivityLabelWidth(width, persist = true) {
+      activityLabelWidth=clamp(Number(width)||300,220,620); document.documentElement.style.setProperty("--label",`${activityLabelWidth}px`);
+      $("decreaseActivityWidth").disabled=activityLabelWidth<=220; $("increaseActivityWidth").disabled=activityLabelWidth>=620;
+      if(persist)localStorage.setItem("cronograma-activity-width",String(activityLabelWidth));
     }
 
     function isoWeek(date) {
@@ -582,7 +594,7 @@
         if (!module.collapsed) {
           module.activities.forEach((activity, activityIndex) => {
             const ownerKey = owners[activity.owner] ? activity.owner : inferOwner(activity); const owner = owners[ownerKey];
-            html += `<div class="timeline-row activity" style="--module-color:${module.color};--activity-color:${owner.color};--activity-fill:${owner.fill}"><div class="sticky-label activity-label"><span class="activity-code">${escapeHtml(module.code)}</span><input class="activity-name" data-name="${module.id}|${activity.id}" value="${escapeHtml(activity.name)}" aria-label="Nome da atividade"><span class="activity-actions"><button class="move-activity" data-move-activity="${module.id}|${activity.id}|-1" title="Mover para cima" aria-label="Mover atividade para cima" ${activityIndex===0?"disabled":""}>↑</button><button class="move-activity" data-move-activity="${module.id}|${activity.id}|1" title="Mover para baixo" aria-label="Mover atividade para baixo" ${activityIndex===module.activities.length-1?"disabled":""}>↓</button><button class="edit-activity" data-edit-activity="${module.id}|${activity.id}" title="Editar atividade" aria-label="Editar atividade">✎</button><button class="remove-activity" data-remove="${module.id}|${activity.id}" title="Excluir atividade" aria-label="Excluir atividade">×</button></span></div>${periods.map(period=>{const active=activity.start<=period.endWeek&&activity.end>=period.startWeek;return `<button class="slot ${active?"active":""} ${period.holidays.length?"holiday-column":""}" data-slot="${module.id}|${activity.id}|${period.startWeek}|${period.endWeek}" aria-label="${escapeHtml(period.ariaLabel)}: ${active?"ativa":"inativa"}; ${escapeHtml(owner.label)}"></button>`;}).join("")}</div>`;
+            html += `<div class="timeline-row activity" style="--module-color:${module.color};--activity-color:${owner.color};--activity-fill:${owner.fill}"><div class="sticky-label activity-label"><span class="activity-code">${escapeHtml(module.code)}</span><input class="activity-name" data-name="${module.id}|${activity.id}" value="${escapeHtml(activity.name)}" title="${escapeHtml(activity.name)}" aria-label="Nome da atividade"><span class="activity-actions"><button class="move-activity" data-move-activity="${module.id}|${activity.id}|-1" title="Mover para cima" aria-label="Mover atividade para cima" ${activityIndex===0?"disabled":""}>↑</button><button class="move-activity" data-move-activity="${module.id}|${activity.id}|1" title="Mover para baixo" aria-label="Mover atividade para baixo" ${activityIndex===module.activities.length-1?"disabled":""}>↓</button><button class="edit-activity" data-edit-activity="${module.id}|${activity.id}" title="Editar atividade" aria-label="Editar atividade">✎</button><button class="remove-activity" data-remove="${module.id}|${activity.id}" title="Excluir atividade" aria-label="Excluir atividade">×</button></span></div>${periods.map(period=>{const active=activity.start<=period.endWeek&&activity.end>=period.startWeek;return `<button class="slot ${active?"active":""} ${period.holidays.length?"holiday-column":""}" data-slot="${module.id}|${activity.id}|${period.startWeek}|${period.endWeek}" aria-label="${escapeHtml(period.ariaLabel)}: ${active?"ativa":"inativa"}; ${escapeHtml(owner.label)}"></button>`;}).join("")}</div>`;
           });
           html += `<div class="add-activity-row"><div class="sticky-label"><button class="btn" data-add="${module.id}">＋ Adicionar atividade</button></div><div></div></div>`;
         }
@@ -718,6 +730,8 @@
     $("viewWeek").onclick=()=>setTimelineView("week");
     $("viewMonth").onclick=()=>setTimelineView("month");
     $("viewQuarter").onclick=()=>setTimelineView("quarter");
+    $("decreaseActivityWidth").onclick=()=>setActivityLabelWidth(activityLabelWidth-40);
+    $("increaseActivityWidth").onclick=()=>setActivityLabelWidth(activityLabelWidth+40);
     function setSidebarCollapsed(collapsed) { $("workspace").classList.toggle("sidebar-collapsed",collapsed); $("sidebarToggle").setAttribute("aria-expanded",String(!collapsed)); $("sidebarToggle").setAttribute("aria-label",collapsed?"Exibir painel lateral":"Recolher painel lateral"); $("sidebarToggle").title=collapsed?"Exibir painel lateral":"Recolher painel lateral"; localStorage.setItem("cronograma-sidebar-collapsed",String(collapsed)); }
     $("sidebarToggle").onclick=()=>setSidebarCollapsed(!$("workspace").classList.contains("sidebar-collapsed"));
     $("newProject").onclick=()=>{ const p=defaultProject(); p.name="Novo projeto de rollout"; p.version="V1"; p.risk=""; projects.push(p); currentId=p.id; setInputs(); save(); render(); notify("Novo projeto criado."); };
@@ -736,7 +750,7 @@
     $("confirmNewOwner").onclick=()=>{ const label=$("newOwnerName").value.trim(),color=$("newOwnerColor").value; if(!label){$("newOwnerName").focus();notify("Informe o nome do novo responsável.");return;} const owners=ownerCatalog(project()); const duplicate=Object.entries(owners).find(([,owner])=>owner.label.toLocaleLowerCase("pt-BR")===label.toLocaleLowerCase("pt-BR")); if(duplicate){populateOwnerOptions(duplicate[0]);$("customOwnerFields").hidden=true;notify("Esse responsável já existe e foi selecionado.");return;} const owner={id:`custom-${crypto.randomUUID()}`,label,color,fill:color}; project().owners=normalizeOwnerList([...(project().owners||[]),owner]); populateOwnerOptions(owner.id); $("customOwnerFields").hidden=true; $("newOwnerName").value=""; markDirty(); notify("Novo responsável adicionado ao índice."); };
     $("confirmActivity").onclick=event=>{ event.preventDefault(); const name=$("newActivityName").value.trim(),moduleId=$("activityModuleId").value,editId=$("activityEditId").value,owner=$("newActivityOwner").value; const module=project().modules.find(item=>item.id===moduleId); if(!name||!module)return; const activity=editId?module.activities.find(item=>item.id===editId):null; if(activity){activity.name=name;activity.owner=owner;}else{module.activities.push({id:crypto.randomUUID(),name,type:"detail",owner,start:0,end:0});} $("activityDialog").close(); markDirty(); render(); notify(activity?"Atividade atualizada.":"Atividade adicionada com o responsável selecionado."); };
     document.querySelectorAll(".close-dialog").forEach(button=>button.onclick=event=>{ event.preventDefault(); const dialog=button.closest("dialog"); if(dialog?.open)dialog.close("cancel"); });
-    setTheme(document.documentElement.dataset.theme); setTimelineView(timelineView,false); setSidebarCollapsed(localStorage.getItem("cronograma-sidebar-collapsed")==="true"); setInputs(); render(); save();
+    setTheme(document.documentElement.dataset.theme); setTimelineView(timelineView,false); setActivityLabelWidth(activityLabelWidth,false); setSidebarCollapsed(localStorage.getItem("cronograma-sidebar-collapsed")==="true"); setInputs(); render(); save();
   </script>
 </body>
 </html>
