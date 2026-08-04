@@ -114,7 +114,11 @@
     .module-head strong { flex: 1; }
     .module-head .module-actions { display: flex; gap: 5px; }
     .activity-label { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 6px 8px; }
-    .activity-code { color: var(--module-color); font-size: 10px; font-weight: 800; }
+    .activity-code { width: 46px; min-height: 26px; display: flex; align-items: center; justify-content: center; gap: 4px; border: 0; border-radius: 3px; padding: 2px; background: transparent; color: var(--module-color); font-size: 10px; font-weight: 800; }
+    .activity-code:hover { background: rgba(23,105,170,.1); }
+    .critical-mark { width: 16px; height: 16px; display: none; place-items: center; border-radius: 50%; background: #c62828; color: #fff; font-size: 11px; font-style: normal; line-height: 1; }
+    .activity-code.critical .critical-mark { display: grid; }
+    .timeline-row.activity.is-critical .activity-label { box-shadow: inset 3px 0 #c62828; }
     .activity-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 0; padding: 4px 2px; background: transparent; color: var(--ink); }
     .activity-name:focus { background: #fff; }
     .activity-actions { display: flex; align-items: center; gap: 2px; }
@@ -597,7 +601,7 @@
         if (!module.collapsed) {
           module.activities.forEach((activity, activityIndex) => {
             const ownerKey = owners[activity.owner] ? activity.owner : inferOwner(activity); const owner = owners[ownerKey];
-            html += `<div class="timeline-row activity" style="--module-color:${module.color};--activity-color:${owner.color};--activity-fill:${owner.fill}"><div class="sticky-label activity-label"><span class="activity-code">${escapeHtml(module.code)}</span><input class="activity-name" data-name="${module.id}|${activity.id}" value="${escapeHtml(activity.name)}" title="${escapeHtml(activity.name)}" aria-label="Nome da atividade"><span class="activity-actions"><button class="move-activity" data-move-activity="${module.id}|${activity.id}|-1" title="Mover para cima" aria-label="Mover atividade para cima" ${activityIndex===0?"disabled":""}>↑</button><button class="move-activity" data-move-activity="${module.id}|${activity.id}|1" title="Mover para baixo" aria-label="Mover atividade para baixo" ${activityIndex===module.activities.length-1?"disabled":""}>↓</button><button class="edit-activity" data-edit-activity="${module.id}|${activity.id}" title="Editar atividade" aria-label="Editar atividade">✎</button><button class="remove-activity" data-remove="${module.id}|${activity.id}" title="Excluir atividade" aria-label="Excluir atividade">×</button></span></div>${periods.map(period=>{const active=activity.start<=period.endWeek&&activity.end>=period.startWeek;return `<button class="slot ${active?"active":""} ${period.holidays.length?"holiday-column":""}" data-slot="${module.id}|${activity.id}|${period.startWeek}|${period.endWeek}" aria-label="${escapeHtml(period.ariaLabel)}: ${active?"ativa":"inativa"}; ${escapeHtml(owner.label)}"></button>`;}).join("")}</div>`;
+            html += `<div class="timeline-row activity ${activity.critical?"is-critical":""}" style="--module-color:${module.color};--activity-color:${owner.color};--activity-fill:${owner.fill}"><div class="sticky-label activity-label"><button class="activity-code ${activity.critical?"critical":""}" data-critical="${module.id}|${activity.id}" aria-pressed="${Boolean(activity.critical)}" title="${activity.critical?"Remover marcação crítica":"Marcar como atividade crítica"}" aria-label="${activity.critical?"Remover marcação crítica":"Marcar como atividade crítica"}"><span>${escapeHtml(module.code)}</span><i class="critical-mark" aria-hidden="true">!</i></button><input class="activity-name" data-name="${module.id}|${activity.id}" value="${escapeHtml(activity.name)}" title="${escapeHtml(activity.name)}" aria-label="Nome da atividade"><span class="activity-actions"><button class="move-activity" data-move-activity="${module.id}|${activity.id}|-1" title="Mover para cima" aria-label="Mover atividade para cima" ${activityIndex===0?"disabled":""}>↑</button><button class="move-activity" data-move-activity="${module.id}|${activity.id}|1" title="Mover para baixo" aria-label="Mover atividade para baixo" ${activityIndex===module.activities.length-1?"disabled":""}>↓</button><button class="edit-activity" data-edit-activity="${module.id}|${activity.id}" title="Editar atividade" aria-label="Editar atividade">✎</button><button class="remove-activity" data-remove="${module.id}|${activity.id}" title="Excluir atividade" aria-label="Excluir atividade">×</button></span></div>${periods.map(period=>{const active=activity.start<=period.endWeek&&activity.end>=period.startWeek;return `<button class="slot ${active?"active":""} ${period.holidays.length?"holiday-column":""}" data-slot="${module.id}|${activity.id}|${period.startWeek}|${period.endWeek}" aria-label="${escapeHtml(period.ariaLabel)}: ${active?"ativa":"inativa"}; ${escapeHtml(owner.label)}"></button>`;}).join("")}</div>`;
           });
           html += `<div class="add-activity-row"><div class="sticky-label"><button class="btn" data-add="${module.id}">＋ Adicionar atividade</button></div><div></div></div>`;
         }
@@ -612,6 +616,7 @@
       document.querySelectorAll("[data-edit-module]").forEach(btn => btn.onclick = () => openModuleDialog(btn.dataset.editModule));
       document.querySelectorAll("[data-duplicate-module]").forEach(btn => btn.onclick = () => duplicateModule(btn.dataset.duplicateModule));
       document.querySelectorAll("[data-remove-module]").forEach(btn => btn.onclick = () => { if (!confirm("Excluir este módulo e todas as atividades?")) return; project().modules=project().modules.filter(m=>m.id!==btn.dataset.removeModule); markDirty(); render(); });
+      document.querySelectorAll("[data-critical]").forEach(btn => btn.onclick = () => { const [mid,aid]=btn.dataset.critical.split("|"); const activity=project().modules.find(module=>module.id===mid)?.activities.find(item=>item.id===aid); if(!activity)return; activity.critical=!activity.critical; markDirty(); renderTimeline(); });
       document.querySelectorAll("[data-move-activity]").forEach(btn => btn.onclick = () => { const [mid,aid,direction]=btn.dataset.moveActivity.split("|"); moveActivity(mid,aid,Number(direction)); });
       document.querySelectorAll("[data-edit-activity]").forEach(btn => btn.onclick = () => { const [mid,aid]=btn.dataset.editActivity.split("|"); openActivityDialog(mid,aid); });
       document.querySelectorAll("[data-remove]").forEach(btn => btn.onclick = () => { const [mid,aid]=btn.dataset.remove.split("|"); const m=project().modules.find(x=>x.id===mid); m.activities=m.activities.filter(a=>a.id!==aid); markDirty(); render(); });
@@ -703,6 +708,7 @@
             name: String(activity?.name || "Atividade sem nome"),
             type: TYPES[activity?.type] ? activity.type : "detail",
             owner: importedOwnerIds.has(activity?.owner) ? activity.owner : inferOwner(activity),
+            critical: Boolean(activity?.critical),
             color: /^#[0-9a-f]{6}$/i.test(activity?.color || "") ? activity.color : undefined,
             start: clamp(Number(activity?.start) || 0, 0, weeks - 1),
             end: clamp(Number.isFinite(Number(activity?.end)) ? Number(activity.end) : 0, -1, weeks - 1)
