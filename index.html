@@ -306,7 +306,6 @@
         <button class="btn" id="duplicateProject">Duplicar</button>
         <button class="btn" id="printProject">Imprimir / PDF</button>
         <button class="btn" id="businessDaysButton">▦ Dias úteis por mês</button>
-        <button class="btn" id="importProject">Importar arquivo</button>
         <button class="btn btn-danger" id="deleteProject">Excluir</button>
       </div>
       <input class="hidden-input" id="importFile" type="file" accept="application/json,.json" />
@@ -773,7 +772,6 @@
     $("editRisk").onclick=()=>$("riskText").focus();
     $("exportProject").onclick=()=>{ save(); const archive={format:"cronograma-projetos",version:1,exportedAt:new Date().toISOString(),project:project()}; const blob=new Blob([JSON.stringify(archive,null,2)],{type:"application/json"}); const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=(project().name.replace(/[^a-z0-9]+/gi,"-").toLowerCase()||"cronograma")+".json"; a.click(); URL.revokeObjectURL(a.href); notify("Arquivo do cronograma exportado."); };
     const openImport=()=>$("importFile").click();
-    $("importProject").onclick=openImport;
     $("importProjectTop").onclick=openImport;
     $("importFile").onchange=async event=>{ try{const payload=JSON.parse(await event.target.files[0].text()); const imported=normalizeImportedProject(payload); projects.push(imported); currentId=imported.id; setInputs(); save(); render(); notify("Arquivo importado com sucesso.");}catch{notify("Arquivo incompatível ou inválido.");} event.target.value=""; };
     $("confirmModule").onclick=event=>{ event.preventDefault(); const name=$("moduleName").value.trim(),code=$("moduleCode").value.trim(),editId=$("moduleEditId").value; if(!name||!code)return; const existing=editId?project().modules.find(module=>module.id===editId):null; if(existing){existing.name=name;existing.code=code;existing.color=$("moduleColor").value;}else{project().modules.push({id:crypto.randomUUID(),code,name,color:$("moduleColor").value,collapsed:false,activities:[]});} $("moduleDialog").close(); $("moduleForm").reset(); markDirty(); render(); notify(existing?"Módulo atualizado.":"Módulo adicionado."); };
