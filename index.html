@@ -299,7 +299,7 @@
       <div class="field"><label for="version">Versão</label><input id="version" placeholder="V1" /></div>
       <div class="field"><label for="riskText">Risco crítico</label><textarea id="riskText" placeholder="Descreva o risco ou deixe em branco"></textarea></div>
       <section class="holiday-check" aria-live="polite">
-        <div class="holiday-check-head"><strong>Feriados nacionais no período</strong><span id="holidayCheckCount"></span></div>
+        <div class="holiday-check-head"><strong>Feriados nacionais</strong><span id="holidayCheckCount"></span></div>
         <div class="holiday-list" id="holidayValidation"></div>
       </section>
       <div class="side-actions">
@@ -583,7 +583,7 @@
     function renderHolidayValidation() {
       const p = project(); const first = dateFromInput(p.startDate); const last = dateFromInput(p.endDate);
       const holidays = nationalHolidaysBetween(first, last); const businessHolidays = holidays.filter(holiday => holiday.isBusinessDay);
-      $("holidayCheckCount").textContent = holidays.length ? `${holidays.length} encontrado${holidays.length === 1 ? "" : "s"}` : "Período validado";
+      $("holidayCheckCount").textContent = holidays.length ? `${holidays.length} no período` : "Período validado";
       $("holidayMetric").textContent = businessHolidays.length;
       $("holidayValidation").innerHTML = holidays.length
         ? holidays.map(holiday => `<div class="holiday-item"><time datetime="${holiday.date.toISOString().slice(0,10)}">${formatDate(holiday.date).slice(0,5)}</time><span>${escapeHtml(holiday.name)}<small>${holiday.isBusinessDay ? "Reduz 1 dia útil e será marcado com *" : "Cai no fim de semana e não reduz dias úteis"}</small></span></div>`).join("")
