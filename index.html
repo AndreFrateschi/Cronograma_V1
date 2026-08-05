@@ -116,9 +116,13 @@
     .activity-label { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 6px 8px; }
     .activity-code { width: 46px; min-height: 26px; display: flex; align-items: center; justify-content: center; gap: 4px; border: 0; border-radius: 3px; padding: 2px; background: transparent; color: var(--module-color); font-size: 10px; font-weight: 800; }
     .activity-code:hover { background: rgba(23,105,170,.1); }
-    .critical-mark { width: 16px; height: 16px; display: none; place-items: center; border-radius: 50%; background: #c62828; color: #fff; font-size: 11px; font-style: normal; line-height: 1; }
+    .critical-mark, .completion-mark { width: 16px; height: 16px; display: none; place-items: center; border-radius: 50%; color: #fff; font-size: 11px; font-style: normal; line-height: 1; }
+    .critical-mark { background: #c62828; }
+    .completion-mark { background: #238a43; }
     .activity-code.critical .critical-mark { display: grid; }
+    .activity-code.completed .completion-mark { display: grid; }
     .timeline-row.activity.is-critical .activity-label { box-shadow: inset 3px 0 #c62828; }
+    .timeline-row.activity.is-completed .activity-label { box-shadow: inset 3px 0 #238a43; }
     .activity-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 0; padding: 4px 2px; background: transparent; color: var(--ink); }
     .activity-name:focus { background: #fff; }
     .activity-actions { display: flex; align-items: center; gap: 2px; }
@@ -321,6 +325,7 @@
           <div class="metric"><span>Semanas no período</span><strong id="weekMetric">0</strong></div>
           <div class="metric"><span>Go Lives</span><strong id="goLiveMetric">0</strong></div>
           <div class="metric"><span>Feriados úteis</span><strong id="holidayMetric">0</strong></div>
+          <div class="metric"><span>Dias úteis</span><strong id="businessDayMetric">0</strong></div>
         </div>
       </section>
       <section class="riskbar" id="riskBar"><strong>Risco</strong><span id="riskBarText"></span><button id="editRisk" aria-label="Editar risco">✎</button></section>
@@ -617,7 +622,9 @@
         if (!module.collapsed) {
           module.activities.forEach((activity, activityIndex) => {
             const ownerKey = owners[activity.owner] ? activity.owner : inferOwner(activity); const owner = owners[ownerKey];
-            html += `<div class="timeline-row activity ${activity.critical?"is-critical":""}" style="--module-color:${module.color};--activity-color:${owner.color};--activity-fill:${owner.fill}"><div class="sticky-label activity-label"><button class="activity-code ${activity.critical?"critical":""}" data-critical="${module.id}|${activity.id}" aria-pressed="${Boolean(activity.critical)}" title="${activity.critical?"Remover marcação crítica":"Marcar como atividade crítica"}" aria-label="${activity.critical?"Remover marcação crítica":"Marcar como atividade crítica"}"><span>${escapeHtml(module.code)}</span><i class="critical-mark" aria-hidden="true">!</i></button><input class="activity-name" data-name="${module.id}|${activity.id}" value="${escapeHtml(activity.name)}" title="${escapeHtml(activity.name)}" aria-label="Nome da atividade"><span class="activity-actions"><button class="move-activity" data-move-activity="${module.id}|${activity.id}|-1" title="Mover para cima" aria-label="Mover atividade para cima" ${activityIndex===0?"disabled":""}>↑</button><button class="move-activity" data-move-activity="${module.id}|${activity.id}|1" title="Mover para baixo" aria-label="Mover atividade para baixo" ${activityIndex===module.activities.length-1?"disabled":""}>↓</button><button class="edit-activity" data-edit-activity="${module.id}|${activity.id}" title="Editar atividade" aria-label="Editar atividade">✎</button><button class="remove-activity" data-remove="${module.id}|${activity.id}" title="Excluir atividade" aria-label="Excluir atividade">×</button></span></div>${periods.map(period=>{const active=activity.startDay<=period.endDay&&activity.endDay>=period.startDay;return `<button class="slot ${active?"active":""} ${period.holidays.length?"holiday-column":""}" data-slot="${module.id}|${activity.id}|${period.startDay}|${period.endDay}" aria-label="${escapeHtml(period.ariaLabel)}: ${active?"ativa":"inativa"}; ${escapeHtml(owner.label)}"></button>`;}).join("")}</div>`;
+            const status=activity.completed?"completed":activity.critical?"critical":"normal";
+            const statusAction=status==="normal"?"Marcar como atividade crítica":status==="critical"?"Marcar atividade como concluída":"Remover marcação de conclusão";
+            html += `<div class="timeline-row activity ${status==="critical"?"is-critical":status==="completed"?"is-completed":""}" style="--module-color:${module.color};--activity-color:${owner.color};--activity-fill:${owner.fill}"><div class="sticky-label activity-label"><button class="activity-code ${status}" data-activity-status="${module.id}|${activity.id}" aria-pressed="${status!=="normal"}" title="${statusAction}" aria-label="${statusAction}"><span>${escapeHtml(module.code)}</span><i class="critical-mark" aria-hidden="true">!</i><i class="completion-mark" aria-hidden="true">✓</i></button><input class="activity-name" data-name="${module.id}|${activity.id}" value="${escapeHtml(activity.name)}" title="${escapeHtml(activity.name)}" aria-label="Nome da atividade"><span class="activity-actions"><button class="move-activity" data-move-activity="${module.id}|${activity.id}|-1" title="Mover para cima" aria-label="Mover atividade para cima" ${activityIndex===0?"disabled":""}>↑</button><button class="move-activity" data-move-activity="${module.id}|${activity.id}|1" title="Mover para baixo" aria-label="Mover atividade para baixo" ${activityIndex===module.activities.length-1?"disabled":""}>↓</button><button class="edit-activity" data-edit-activity="${module.id}|${activity.id}" title="Editar atividade" aria-label="Editar atividade">✎</button><button class="remove-activity" data-remove="${module.id}|${activity.id}" title="Excluir atividade" aria-label="Excluir atividade">×</button></span></div>${periods.map(period=>{const active=activity.startDay<=period.endDay&&activity.endDay>=period.startDay;return `<button class="slot ${active?"active":""} ${period.holidays.length?"holiday-column":""}" data-slot="${module.id}|${activity.id}|${period.startDay}|${period.endDay}" aria-label="${escapeHtml(period.ariaLabel)}: ${active?"ativa":"inativa"}; ${escapeHtml(owner.label)}"></button>`;}).join("")}</div>`;
           });
           html += `<div class="add-activity-row"><div class="sticky-label"><button class="btn" data-add="${module.id}">＋ Adicionar atividade</button></div><div></div></div>`;
         }
@@ -632,7 +639,7 @@
       document.querySelectorAll("[data-edit-module]").forEach(btn => btn.onclick = () => openModuleDialog(btn.dataset.editModule));
       document.querySelectorAll("[data-duplicate-module]").forEach(btn => btn.onclick = () => duplicateModule(btn.dataset.duplicateModule));
       document.querySelectorAll("[data-remove-module]").forEach(btn => btn.onclick = () => { if (!confirm("Excluir este módulo e todas as atividades?")) return; project().modules=project().modules.filter(m=>m.id!==btn.dataset.removeModule); markDirty(); render(); });
-      document.querySelectorAll("[data-critical]").forEach(btn => btn.onclick = () => { const [mid,aid]=btn.dataset.critical.split("|"); const activity=project().modules.find(module=>module.id===mid)?.activities.find(item=>item.id===aid); if(!activity)return; activity.critical=!activity.critical; markDirty(); renderTimeline(); });
+      document.querySelectorAll("[data-activity-status]").forEach(btn => btn.onclick = () => { const [mid,aid]=btn.dataset.activityStatus.split("|"); const activity=project().modules.find(module=>module.id===mid)?.activities.find(item=>item.id===aid); if(!activity)return; if(activity.completed){activity.completed=false;activity.critical=false;}else if(activity.critical){activity.critical=false;activity.completed=true;}else{activity.critical=true;activity.completed=false;} markDirty(); renderTimeline(); });
       document.querySelectorAll("[data-move-activity]").forEach(btn => btn.onclick = () => { const [mid,aid,direction]=btn.dataset.moveActivity.split("|"); moveActivity(mid,aid,Number(direction)); });
       document.querySelectorAll("[data-edit-activity]").forEach(btn => btn.onclick = () => { const [mid,aid]=btn.dataset.editActivity.split("|"); openActivityDialog(mid,aid); });
       document.querySelectorAll("[data-remove]").forEach(btn => btn.onclick = () => { const [mid,aid]=btn.dataset.remove.split("|"); const m=project().modules.find(x=>x.id===mid); m.activities=m.activities.filter(a=>a.id!==aid); markDirty(); render(); });
@@ -701,7 +708,7 @@
       $("barProjectName").textContent=p.name; $("barPeriod").textContent=`${formatDate(first)} a ${formatDate(last)} · ${p.version||""}`;
       $("mainProjectName").textContent=p.name; $("mainProjectMeta").textContent=`Estratégia de implantação · ${formatDate(first)} a ${formatDate(last)}`;
       $("riskBarText").textContent=p.risk || "Nenhum risco crítico informado."; $("riskBar").classList.toggle("empty-risk",!p.risk);
-      $("moduleMetric").textContent=p.modules.length; const activities=p.modules.flatMap(m=>m.activities); $("activityMetric").textContent=activities.length; $("weekMetric").textContent=durationWeeks; $("goLiveMetric").textContent=activities.filter(a=>a.type==="golive").length; $("rangeSummary").textContent=`${durationWeeks} semanas entre as datas`;
+      $("moduleMetric").textContent=p.modules.length; const activities=p.modules.flatMap(m=>m.activities); $("activityMetric").textContent=activities.length; $("weekMetric").textContent=durationWeeks; $("goLiveMetric").textContent=activities.filter(a=>a.type==="golive").length; $("businessDayMetric").textContent=businessInfoBetween(first,last).businessDays; $("rangeSummary").textContent=`${durationWeeks} semanas entre as datas`;
       renderHolidayValidation(); renderTimeline(); renderProjectList();
     }
     function normalizeImportedProject(payload) {
@@ -725,7 +732,8 @@
             const legacyStart=clamp(Number(activity?.start)||0,0,weeks-1),legacyEnd=clamp(Number.isFinite(Number(activity?.end))?Number(activity.end):0,-1,weeks-1);
             const startDay=Number.isFinite(Number(activity?.startDay))?clamp(Number(activity.startDay),0,maxDay):clamp(legacyStart*7,0,maxDay);
             const endDay=Number.isFinite(Number(activity?.endDay))?clamp(Number(activity.endDay),-1,maxDay):(legacyEnd<legacyStart?-1:clamp((legacyEnd+1)*7-1,-1,maxDay));
-            return {id:crypto.randomUUID(),name:String(activity?.name||"Atividade sem nome"),type:TYPES[activity?.type]?activity.type:"detail",owner:importedOwnerIds.has(activity?.owner)?activity.owner:inferOwner(activity),critical:Boolean(activity?.critical),color:/^#[0-9a-f]{6}$/i.test(activity?.color||"")?activity.color:undefined,startDay,endDay,start:endDay<startDay?0:Math.floor(startDay/7),end:endDay<startDay?-1:Math.floor(endDay/7)};
+            const completed=Boolean(activity?.completed);
+            return {id:crypto.randomUUID(),name:String(activity?.name||"Atividade sem nome"),type:TYPES[activity?.type]?activity.type:"detail",owner:importedOwnerIds.has(activity?.owner)?activity.owner:inferOwner(activity),critical:Boolean(activity?.critical)&&!completed,completed,color:/^#[0-9a-f]{6}$/i.test(activity?.color||"")?activity.color:undefined,startDay,endDay,start:endDay<startDay?0:Math.floor(startDay/7),end:endDay<startDay?-1:Math.floor(endDay/7)};
           })
         };
       });
@@ -794,7 +802,7 @@
       }
       populateOwnerOptions(selectedId); $("customOwnerFields").hidden=true; $("newOwnerName").value=""; $("ownerEditId").value=""; markDirty(); renderTimeline(); notify(editId?"Responsável atualizado em todas as atividades.":"Novo responsável adicionado ao índice.");
     };
-    $("confirmActivity").onclick=event=>{ event.preventDefault(); const name=$("newActivityName").value.trim(),moduleId=$("activityModuleId").value,editId=$("activityEditId").value,owner=$("newActivityOwner").value; const module=project().modules.find(item=>item.id===moduleId); if(!name||!module)return; const activity=editId?module.activities.find(item=>item.id===editId):null; if(activity){activity.name=name;activity.owner=owner;}else{module.activities.push({id:crypto.randomUUID(),name,type:"detail",owner,start:0,end:0,startDay:0,endDay:0});} $("activityDialog").close(); markDirty(); render(); notify(activity?"Atividade atualizada.":"Atividade adicionada com o responsável selecionado."); };
+    $("confirmActivity").onclick=event=>{ event.preventDefault(); const name=$("newActivityName").value.trim(),moduleId=$("activityModuleId").value,editId=$("activityEditId").value,owner=$("newActivityOwner").value; const module=project().modules.find(item=>item.id===moduleId); if(!name||!module)return; const activity=editId?module.activities.find(item=>item.id===editId):null; if(activity){activity.name=name;activity.owner=owner;}else{module.activities.push({id:crypto.randomUUID(),name,type:"detail",owner,critical:false,completed:false,start:0,end:0,startDay:0,endDay:0});} $("activityDialog").close(); markDirty(); render(); notify(activity?"Atividade atualizada.":"Atividade adicionada com o responsável selecionado."); };
     document.querySelectorAll(".close-dialog").forEach(button=>button.onclick=event=>{ event.preventDefault(); const dialog=button.closest("dialog"); if(dialog?.open)dialog.close("cancel"); });
     setTheme(document.documentElement.dataset.theme); setTimelineView(timelineView,false); setActivityLabelWidth(activityLabelWidth,false); setSidebarCollapsed(localStorage.getItem("cronograma-sidebar-collapsed")==="true"); setInputs(); render(); save();
   </script>
