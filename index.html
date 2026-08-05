@@ -274,7 +274,7 @@
   <header class="appbar">
     <button class="sidebar-toggle" id="sidebarToggle" type="button" title="Recolher painel lateral" aria-label="Recolher painel lateral" aria-expanded="true">☰</button>
     <div class="brand"><div class="brand-mark">C</div><div><strong>Cronograma de Projetos</strong><span>Planejamento e acompanhamento</span></div></div>
-    <div class="project-heading"><strong id="barProjectName">Rollout Yamaha DDC/Data Lake</strong><span id="barPeriod">18 semanas</span></div>
+    <div class="project-heading"><strong id="barProjectName">Projeto modelo de rollout</strong><span id="barPeriod">18 semanas</span></div>
     <div class="toolbar">
       <div class="theme-switch" role="group" aria-label="Tema visual">
         <button class="theme-option" id="lightTheme" type="button" title="Usar tema claro" aria-label="Tema claro" aria-pressed="true">☀</button>
@@ -315,7 +315,7 @@
 
     <main class="main">
       <section class="summary">
-        <div class="summary-copy"><h1 id="mainProjectName">Rollout Yamaha DDC/Data Lake</h1><p id="mainProjectMeta">Estratégia de implantação</p></div>
+        <div class="summary-copy"><h1 id="mainProjectName">Projeto modelo de rollout</h1><p id="mainProjectMeta">Estratégia de implantação</p></div>
         <div class="metrics" aria-label="Resumo do projeto">
           <div class="metric"><span>Módulos</span><strong id="moduleMetric">2</strong></div>
           <div class="metric"><span>Atividades</span><strong id="activityMetric">0</strong></div>
@@ -418,22 +418,25 @@
     ];
     const seedActivities = (code, offset = 0) => [
       ["Detalhamento","detail",0+offset,2+offset],["Comunicação e Engajamento (GMO)","communication",0+offset,7+offset],
-      ["Aprovação das histórias","approval",2+offset,3+offset],["Desenvolvimento TS","development",3+offset,8+offset],
+      ["Aprovação dos requisitos","approval",2+offset,3+offset],["Desenvolvimento técnico","development",3+offset,8+offset],
       ["Mapeamento de Impactos (GMO)","impact",2+offset,3+offset],["Mapeamento Usuários Finais e Est. Treinamento (GMO)","impact",2+offset,3+offset],
-      ["Implantação Homologação","validation",8+offset,8+offset],["Verificação TS","validation",8+offset,8+offset],
+      ["Implantação em homologação","validation",8+offset,8+offset],["Verificação técnica","validation",8+offset,8+offset],
       ["Validação de Negócio","validation",9+offset,10+offset],["Go/No Go","decision",11+offset,11+offset],
       ["Treinamento Multiplicadores (GMO)","training",11+offset,11+offset],["Replicação do Treinamento (Usuários) (GMO)","training",11+offset,11+offset],
       ["GMUD","change",11+offset,11+offset],["Go Live","golive",11+offset,11+offset],
       ["Hypercare","hypercare",13+offset,17+offset],["Reforço de processos e/ou capacitação (GMO)","hypercare",13+offset,14+offset]
     ].map(([name,type,start,end], i) => ({ id: code+"-"+i+"-"+Date.now(), name, type, start, end }));
-    const defaultProject = () => ({
-      id: crypto.randomUUID(), name: "Rollout Yamaha DDC/Data Lake", startDate: "2026-07-13", endDate: "2026-11-15", weeks: 18, version: "V2",
-      risk: "Não entrega das informações a monitorar via DDC (Módulo 1) — dependência crítica para o Go Live.",
+    const defaultProject = () => {
+      const startDate=toInputDate(monday(toInputDate(new Date()))),endDate=deriveEndDate(startDate,18);
+      return {
+      id: crypto.randomUUID(), name: "Projeto modelo de rollout", startDate, endDate, weeks: 18, version: "V1",
+      risk: "",
       modules: [
-        { id: crypto.randomUUID(), code: "M1", name: "MONITORAMENTO E VISUALIZAÇÃO DE DCs 01 A 05 + MOLDES", color: "#1d63b7", collapsed: false, activities: seedActivities("M1") },
-        { id: crypto.randomUUID(), code: "M2", name: "MONITORAMENTO DE OUTROS PARÂMETROS E VISÕES HISTÓRICAS", color: "#247c32", collapsed: false, activities: seedActivities("M2", 2) }
+        { id: crypto.randomUUID(), code: "M1", name: "PLANEJAMENTO E PREPARAÇÃO", color: "#1d63b7", collapsed: false, activities: seedActivities("M1") },
+        { id: crypto.randomUUID(), code: "M2", name: "IMPLANTAÇÃO E ESTABILIZAÇÃO", color: "#247c32", collapsed: false, activities: seedActivities("M2", 2) }
       ]
-    });
+      };
+    };
     let projects = JSON.parse(localStorage.getItem("rollout-studio-projects") || "null") || [defaultProject()];
     let currentId = localStorage.getItem("rollout-studio-current") || projects[0].id;
     if (!projects.some(p => p.id === currentId)) currentId = projects[0].id;
