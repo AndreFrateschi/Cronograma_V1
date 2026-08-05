@@ -57,9 +57,9 @@
     .range-summary { margin: -5px 0 13px; color: var(--muted); font-size: 11px; }
     .field-row { display: grid; grid-template-columns: 1fr 92px; gap: 10px; }
     .holiday-check { margin: 14px 0 4px; padding: 11px; border: 1px solid #c7d4da; border-left: 4px solid #d88a12; background: #fff; }
-    .holiday-check-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
-    .holiday-check-head strong { font-size: 12px; }
-    .holiday-check-head span { color: var(--muted); font-size: 10px; }
+    .holiday-check-head { display: flex; align-items: center; justify-content: space-between; gap: 5px; margin-bottom: 8px; white-space: nowrap; }
+    .holiday-check-head strong { min-width: 0; font-size: 11px; line-height: 1.2; }
+    .holiday-check-head span { flex: 0 0 auto; color: var(--muted); font-size: 9px; }
     .holiday-list { display: grid; gap: 6px; }
     .holiday-item { display: grid; grid-template-columns: 54px 1fr; gap: 7px; align-items: start; color: #536670; font-size: 11px; }
     .holiday-item time { color: #a35f00; font-weight: 800; }
@@ -303,7 +303,7 @@
         <div class="holiday-list" id="holidayValidation"></div>
       </section>
       <div class="side-actions">
-        <button class="btn" id="duplicateProject">Duplicar</button>
+        <button class="btn" id="duplicateProject">Duplicar projeto</button>
         <button class="btn" id="printProject">Imprimir / PDF</button>
         <button class="btn" id="businessDaysButton">▦ Dias úteis por mês</button>
         <button class="btn btn-danger" id="deleteProject">Excluir</button>
