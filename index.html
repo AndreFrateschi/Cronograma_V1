@@ -411,6 +411,7 @@
       shared: { label: "Itens da T-Systems e Yamaha", color: "#e20074", secondaryColor: "#1769aa" },
       yamaha_tsystems: { label: "Itens da Yamaha e T-Systems", color: "#1769aa", secondaryColor: "#e20074" }
     };
+    const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
     const NATIONAL_HOLIDAYS = [
       [0,1,"Confraternização Universal"],[3,21,"Tiradentes"],[4,1,"Dia Mundial do Trabalho"],
       [8,7,"Independência do Brasil"],[9,12,"Nossa Senhora Aparecida"],[10,2,"Finados"],
@@ -418,9 +419,9 @@
     ];
     const seedActivities = (code, offset = 0) => [
       ["Detalhamento","detail",0+offset,2+offset],["Comunicação e Engajamento (GMO)","communication",0+offset,7+offset],
-      ["Aprovação dos requisitos","approval",2+offset,3+offset],["Desenvolvimento técnico","development",3+offset,8+offset],
+      ["Aprovação das histórias","approval",2+offset,3+offset],["Desenvolvimento TS","development",3+offset,8+offset],
       ["Mapeamento de Impactos (GMO)","impact",2+offset,3+offset],["Mapeamento Usuários Finais e Est. Treinamento (GMO)","impact",2+offset,3+offset],
-      ["Implantação em homologação","validation",8+offset,8+offset],["Verificação técnica","validation",8+offset,8+offset],
+      ["Implantação Homologação","validation",8+offset,8+offset],["Verificação TS","validation",8+offset,8+offset],
       ["Validação de Negócio","validation",9+offset,10+offset],["Go/No Go","decision",11+offset,11+offset],
       ["Treinamento Multiplicadores (GMO)","training",11+offset,11+offset],["Replicação do Treinamento (Usuários) (GMO)","training",11+offset,11+offset],
       ["GMUD","change",11+offset,11+offset],["Go Live","golive",11+offset,11+offset],
@@ -429,11 +430,11 @@
     const defaultProject = () => {
       const startDate=toInputDate(monday(toInputDate(new Date()))),endDate=deriveEndDate(startDate,18);
       return {
-      id: crypto.randomUUID(), name: "Projeto modelo de rollout", startDate, endDate, weeks: 18, version: "V1",
-      risk: "",
+      id: crypto.randomUUID(), name: "Projeto modelo de rollout", startDate, endDate, weeks: 18, version: "V2",
+      risk: "Não entrega das informações a monitorar (Módulo 1) — dependência crítica para o Go Live.",
       modules: [
-        { id: crypto.randomUUID(), code: "M1", name: "PLANEJAMENTO E PREPARAÇÃO", color: "#1d63b7", collapsed: false, activities: seedActivities("M1") },
-        { id: crypto.randomUUID(), code: "M2", name: "IMPLANTAÇÃO E ESTABILIZAÇÃO", color: "#247c32", collapsed: false, activities: seedActivities("M2", 2) }
+        { id: crypto.randomUUID(), code: "M1", name: "MONITORAMENTO E VISUALIZAÇÃO DE DCs 01 A 05 + MOLDES", color: "#1d63b7", collapsed: false, activities: seedActivities("M1") },
+        { id: crypto.randomUUID(), code: "M2", name: "MONITORAMENTO DE OUTROS PARÂMETROS E VISÕES HISTÓRICAS", color: "#247c32", collapsed: false, activities: seedActivities("M2", 2) }
       ]
       };
     };
@@ -442,7 +443,6 @@
     if (!projects.some(p => p.id === currentId)) currentId = projects[0].id;
     const $ = id => document.getElementById(id);
     const project = () => projects.find(p => p.id === currentId);
-    const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
     projects.forEach(syncProjectRange);
     const escapeHtml = value => String(value).replace(/[&<>'"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c]));
     let dirtyTimer;
