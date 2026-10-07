@@ -487,13 +487,26 @@
     function timelineWeeksForRange(startDate, endDate) { return Math.ceil(((dateFromInput(endDate) - monday(startDate)) / 86400000 + 1) / 7); }
     function durationWeeksForRange(startDate, endDate) { return Math.ceil(((dateFromInput(endDate) - dateFromInput(startDate)) / 86400000 + 1) / 7); }
     function timelineDayCount(item) { return Math.floor((dateFromInput(item.endDate)-monday(item.startDate))/86400000)+1; }
+    function normalizeDayRanges(ranges,maxDay) {
+      const normalized=(Array.isArray(ranges)?ranges:[]).map(range=>Array.isArray(range)?range:[range?.start,range?.end]).filter(range=>Number.isFinite(Number(range[0]))&&Number.isFinite(Number(range[1]))).map(range=>[clamp(Math.min(Number(range[0]),Number(range[1])),0,maxDay),clamp(Math.max(Number(range[0]),Number(range[1])),0,maxDay)]).sort((a,b)=>a[0]-b[0]);
+      return normalized.reduce((merged,range)=>{const last=merged.at(-1);if(last&&range[0]<=last[1]+1)last[1]=Math.max(last[1],range[1]);else merged.push(range);return merged;},[]);
+    }
     function syncActivityPrecision(activity,item) {
       const maxDay=Math.max(0,timelineDayCount(item)-1),hasDaily=Number.isFinite(Number(activity.startDay))&&Number.isFinite(Number(activity.endDay));
-      if(hasDaily){activity.startDay=clamp(Number(activity.startDay),0,maxDay);activity.endDay=clamp(Number(activity.endDay),-1,maxDay);}
-      else if(Number(activity.end)<Number(activity.start)){activity.startDay=0;activity.endDay=-1;}
-      else{activity.startDay=clamp((Number(activity.start)||0)*7,0,maxDay);activity.endDay=clamp(((Number(activity.end)||0)+1)*7-1,-1,maxDay);}
+      if(!Array.isArray(activity.ranges)){if(hasDaily)activity.ranges=Number(activity.endDay)<Number(activity.startDay)?[]:[[Number(activity.startDay),Number(activity.endDay)]];else if(Number(activity.end)<Number(activity.start))activity.ranges=[];else activity.ranges=[[(Number(activity.start)||0)*7,((Number(activity.end)||0)+1)*7-1]];}
+      activity.ranges=normalizeDayRanges(activity.ranges,maxDay);
+      if(activity.ranges.length){activity.startDay=activity.ranges[0][0];activity.endDay=activity.ranges.at(-1)[1];}else{activity.startDay=0;activity.endDay=-1;}
+      
+      
       if(activity.endDay<activity.startDay){activity.start=0;activity.end=-1;}else{activity.start=Math.floor(activity.startDay/7);activity.end=Math.floor(activity.endDay/7);}
       return activity;
+    }
+    function activityOverlapsPeriod(activity,startDay,endDay) { return (activity.ranges||[]).some(range=>range[0]<=endDay&&range[1]>=startDay); }
+    function toggleActivityPeriod(activity,startDay,endDay,item) {
+      syncActivityPrecision(activity,item); const maxDay=Math.max(0,timelineDayCount(item)-1),from=clamp(startDay,0,maxDay),to=clamp(endDay,0,maxDay);
+      if(activityOverlapsPeriod(activity,from,to))activity.ranges=activity.ranges.flatMap(([start,end])=>{if(end<from||start>to)return [[start,end]];const parts=[];if(start<from)parts.push([start,from-1]);if(end>to)parts.push([to+1,end]);return parts;});
+      else activity.ranges=normalizeDayRanges([...activity.ranges,[from,to]],maxDay);
+      syncActivityPrecision(activity,item);
     }
     function syncProjectRange(item) {
       item.endDate = /^\d{4}-\d{2}-\d{2}$/.test(item.endDate || "") ? item.endDate : deriveEndDate(item.startDate, item.weeks);
@@ -624,7 +637,7 @@
             const ownerKey = owners[activity.owner] ? activity.owner : inferOwner(activity); const owner = owners[ownerKey];
             const status=activity.completed?"completed":activity.critical?"critical":"normal";
             const statusAction=status==="normal"?"Marcar como atividade crítica":status==="critical"?"Marcar atividade como concluída":"Remover marcação de conclusão";
-            html += `<div class="timeline-row activity ${status==="critical"?"is-critical":status==="completed"?"is-completed":""}" style="--module-color:${module.color};--activity-color:${owner.color};--activity-fill:${owner.fill}"><div class="sticky-label activity-label"><button class="activity-code ${status}" data-activity-status="${module.id}|${activity.id}" aria-pressed="${status!=="normal"}" title="${statusAction}" aria-label="${statusAction}"><span>${escapeHtml(module.code)}</span><i class="critical-mark" aria-hidden="true">!</i><i class="completion-mark" aria-hidden="true">✓</i></button><input class="activity-name" data-name="${module.id}|${activity.id}" value="${escapeHtml(activity.name)}" title="${escapeHtml(activity.name)}" aria-label="Nome da atividade"><span class="activity-actions"><button class="move-activity" data-move-activity="${module.id}|${activity.id}|-1" title="Mover para cima" aria-label="Mover atividade para cima" ${activityIndex===0?"disabled":""}>↑</button><button class="move-activity" data-move-activity="${module.id}|${activity.id}|1" title="Mover para baixo" aria-label="Mover atividade para baixo" ${activityIndex===module.activities.length-1?"disabled":""}>↓</button><button class="edit-activity" data-edit-activity="${module.id}|${activity.id}" title="Editar atividade" aria-label="Editar atividade">✎</button><button class="remove-activity" data-remove="${module.id}|${activity.id}" title="Excluir atividade" aria-label="Excluir atividade">×</button></span></div>${periods.map(period=>{const active=activity.startDay<=period.endDay&&activity.endDay>=period.startDay;return `<button class="slot ${active?"active":""} ${period.holidays.length?"holiday-column":""}" data-slot="${module.id}|${activity.id}|${period.startDay}|${period.endDay}" aria-label="${escapeHtml(period.ariaLabel)}: ${active?"ativa":"inativa"}; ${escapeHtml(owner.label)}"></button>`;}).join("")}</div>`;
+            html += `<div class="timeline-row activity ${status==="critical"?"is-critical":status==="completed"?"is-completed":""}" style="--module-color:${module.color};--activity-color:${owner.color};--activity-fill:${owner.fill}"><div class="sticky-label activity-label"><button class="activity-code ${status}" data-activity-status="${module.id}|${activity.id}" aria-pressed="${status!=="normal"}" title="${statusAction}" aria-label="${statusAction}"><span>${escapeHtml(module.code)}</span><i class="critical-mark" aria-hidden="true">!</i><i class="completion-mark" aria-hidden="true">✓</i></button><input class="activity-name" data-name="${module.id}|${activity.id}" value="${escapeHtml(activity.name)}" title="${escapeHtml(activity.name)}" aria-label="Nome da atividade"><span class="activity-actions"><button class="move-activity" data-move-activity="${module.id}|${activity.id}|-1" title="Mover para cima" aria-label="Mover atividade para cima" ${activityIndex===0?"disabled":""}>↑</button><button class="move-activity" data-move-activity="${module.id}|${activity.id}|1" title="Mover para baixo" aria-label="Mover atividade para baixo" ${activityIndex===module.activities.length-1?"disabled":""}>↓</button><button class="edit-activity" data-edit-activity="${module.id}|${activity.id}" title="Editar atividade" aria-label="Editar atividade">✎</button><button class="remove-activity" data-remove="${module.id}|${activity.id}" title="Excluir atividade" aria-label="Excluir atividade">×</button></span></div>${periods.map(period=>{const active=activityOverlapsPeriod(activity,period.startDay,period.endDay);return `<button class="slot ${active?"active":""} ${period.holidays.length?"holiday-column":""}" data-slot="${module.id}|${activity.id}|${period.startDay}|${period.endDay}" aria-label="${escapeHtml(period.ariaLabel)}: ${active?"ativa":"inativa"}; ${escapeHtml(owner.label)}"></button>`;}).join("")}</div>`;
           });
           html += `<div class="add-activity-row"><div class="sticky-label"><button class="btn" data-add="${module.id}">＋ Adicionar atividade</button></div><div></div></div>`;
         }
@@ -674,13 +687,13 @@
     }
     function toggleSlot(value) {
       const [mid,aid,startText,endText]=value.split("|"); const periodStart=Number(startText),periodEnd=Number(endText??startText); const a=project().modules.find(x=>x.id===mid).activities.find(x=>x.id===aid);
-      const overlaps=a.startDay<=periodEnd&&a.endDay>=periodStart,maxDay=timelineDayCount(project())-1;
-      if(!overlaps){if(a.endDay<a.startDay){a.startDay=periodStart;a.endDay=periodEnd;}else if(periodEnd<a.startDay)a.startDay=periodStart;else a.endDay=periodEnd;}
-      else if(periodStart<=a.startDay&&periodEnd>=a.endDay){a.startDay=0;a.endDay=-1;}
-      else if(periodStart<=a.startDay)a.startDay=clamp(periodEnd+1,0,maxDay);
-      else if(periodEnd>=a.endDay)a.endDay=periodStart-1;
-      else a.endDay=periodStart-1;
-      syncActivityPrecision(a,project());
+      toggleActivityPeriod(a,periodStart,periodEnd,project());
+      
+      
+      
+      
+      
+      
       markDirty(); renderTimeline();
     }
     function addActivity(moduleId) { openActivityDialog(moduleId); }
@@ -732,8 +745,9 @@
             const legacyStart=clamp(Number(activity?.start)||0,0,weeks-1),legacyEnd=clamp(Number.isFinite(Number(activity?.end))?Number(activity.end):0,-1,weeks-1);
             const startDay=Number.isFinite(Number(activity?.startDay))?clamp(Number(activity.startDay),0,maxDay):clamp(legacyStart*7,0,maxDay);
             const endDay=Number.isFinite(Number(activity?.endDay))?clamp(Number(activity.endDay),-1,maxDay):(legacyEnd<legacyStart?-1:clamp((legacyEnd+1)*7-1,-1,maxDay));
+            const ranges=normalizeDayRanges(Array.isArray(activity?.ranges)?activity.ranges:(endDay<startDay?[]:[[startDay,endDay]]),maxDay),rangeStart=ranges.length?ranges[0][0]:0,rangeEnd=ranges.length?ranges.at(-1)[1]:-1;
             const completed=Boolean(activity?.completed);
-            return {id:crypto.randomUUID(),name:String(activity?.name||"Atividade sem nome"),type:TYPES[activity?.type]?activity.type:"detail",owner:importedOwnerIds.has(activity?.owner)?activity.owner:inferOwner(activity),critical:Boolean(activity?.critical)&&!completed,completed,color:/^#[0-9a-f]{6}$/i.test(activity?.color||"")?activity.color:undefined,startDay,endDay,start:endDay<startDay?0:Math.floor(startDay/7),end:endDay<startDay?-1:Math.floor(endDay/7)};
+            return {id:crypto.randomUUID(),name:String(activity?.name||"Atividade sem nome"),type:TYPES[activity?.type]?activity.type:"detail",owner:importedOwnerIds.has(activity?.owner)?activity.owner:inferOwner(activity),critical:Boolean(activity?.critical)&&!completed,completed,color:/^#[0-9a-f]{6}$/i.test(activity?.color||"")?activity.color:undefined,ranges,startDay:rangeStart,endDay:rangeEnd,start:rangeEnd<rangeStart?0:Math.floor(rangeStart/7),end:rangeEnd<rangeStart?-1:Math.floor(rangeEnd/7)};
           })
         };
       });
@@ -802,7 +816,7 @@
       }
       populateOwnerOptions(selectedId); $("customOwnerFields").hidden=true; $("newOwnerName").value=""; $("ownerEditId").value=""; markDirty(); renderTimeline(); notify(editId?"Responsável atualizado em todas as atividades.":"Novo responsável adicionado ao índice.");
     };
-    $("confirmActivity").onclick=event=>{ event.preventDefault(); const name=$("newActivityName").value.trim(),moduleId=$("activityModuleId").value,editId=$("activityEditId").value,owner=$("newActivityOwner").value; const module=project().modules.find(item=>item.id===moduleId); if(!name||!module)return; const activity=editId?module.activities.find(item=>item.id===editId):null; if(activity){activity.name=name;activity.owner=owner;}else{module.activities.push({id:crypto.randomUUID(),name,type:"detail",owner,critical:false,completed:false,start:0,end:0,startDay:0,endDay:0});} $("activityDialog").close(); markDirty(); render(); notify(activity?"Atividade atualizada.":"Atividade adicionada com o responsável selecionado."); };
+    $("confirmActivity").onclick=event=>{ event.preventDefault(); const name=$("newActivityName").value.trim(),moduleId=$("activityModuleId").value,editId=$("activityEditId").value,owner=$("newActivityOwner").value; const module=project().modules.find(item=>item.id===moduleId); if(!name||!module)return; const activity=editId?module.activities.find(item=>item.id===editId):null; if(activity){activity.name=name;activity.owner=owner;}else{module.activities.push({id:crypto.randomUUID(),name,type:"detail",owner,critical:false,completed:false,ranges:[[0,0]],start:0,end:0,startDay:0,endDay:0});} $("activityDialog").close(); markDirty(); render(); notify(activity?"Atividade atualizada.":"Atividade adicionada com o responsável selecionado."); };
     document.querySelectorAll(".close-dialog").forEach(button=>button.onclick=event=>{ event.preventDefault(); const dialog=button.closest("dialog"); if(dialog?.open)dialog.close("cancel"); });
     setTheme(document.documentElement.dataset.theme); setTimelineView(timelineView,false); setActivityLabelWidth(activityLabelWidth,false); setSidebarCollapsed(localStorage.getItem("cronograma-sidebar-collapsed")==="true"); setInputs(); render(); save();
   </script>
